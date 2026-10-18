@@ -3,15 +3,21 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    # The Pi-Bolt source. The fork branch carries the staged-tsconfig fix (opensec-git/Pi-Bolt PR 51) until it is merged.
+    # The release: its VERSION selects the runtime (nix/runtime.json), and it is the default source's identity.
     pi-bolt = {
+      url = "github:opensec-git/Pi-Bolt/bolt-v0.9.4";
+      flake = false;
+    };
+    # What gets compiled. The fork branch carries the staged-tsconfig fix (opensec-git/Pi-Bolt PR 51) until a release has it.
+    # Downstream: `inputs.pi-bolt-nix.inputs.pi-bolt-source.url = ...` (tested: the consumer's lock then pins that source).
+    pi-bolt-source = {
       url = "github:Shrub24/Pi-Bolt/fix/compiled-plugin-host-modules";
       flake = false;
     };
   };
 
   outputs =
-    { self, nixpkgs, pi-bolt }:
+    { self, nixpkgs, pi-bolt, pi-bolt-source }:
     let
       systems = [
         "x86_64-linux"
@@ -22,8 +28,11 @@
     in
     {
       overlays.default = final: _prev: {
-        piBoltPlugins = final.callPackage ./nix/plugins { source = pi-bolt; };
-        pi-bolt = final.callPackage ./nix/pi-bolt.nix { source = pi-bolt; };
+        piBoltPlugins = final.callPackage ./nix/plugins { source = pi-bolt-source; };
+        pi-bolt = final.callPackage ./nix/pi-bolt.nix {
+          release = pi-bolt;
+          source = pi-bolt-source;
+        };
       };
 
       packages = forAllSystems (pkgs: {

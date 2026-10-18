@@ -36,11 +36,13 @@ let
 in
 {
   workspace = only "pi-bolt-workspace-source" workspaceFiles;
-  # What the compile reads on top of the workspace: its scripts, the training profile, and the release's version.
+  # What the compile reads on top of the workspace: its scripts, the training profile, the engine's patches (the runtime's stamp
+  # is a hash of them), and the release's version.
   compile = only "pi-bolt-source" (
     workspaceFiles
     ++ [
       "scripts"
+      "patches"
       "profiles"
       "VERSION"
       "sources.json"

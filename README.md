@@ -36,11 +36,18 @@ With the overlay (`overlays.default`), `pkgs.pi-bolt`, `pkgs.pi-bolt.withPlugins
 - `nix/plugins/`: `buildPiBoltPlugin` and `fetchNpmPackage`, and the scope that carries the examples.
 - `nix/tests/`: the plugin contract, compiled in and loaded from the store.
 
-## Source and runtime
+## Release, source and runtime
 
-`pi-bolt` is a non-flake input, pinned by `flake.lock`. The runtime is the release runtime `nix/runtime.json` names,
-checked against its hash. Engine changes on Pi-Bolt's main reach this flake when a new runtime is released: a source build does not
-rebuild the runtime, which takes about an hour and 40 GB.
+- `pi-bolt` (input): the release, `bolt-v0.9.4`. Its `VERSION` selects the runtime, and its tag names the release.
+- `pi-bolt-source` (input): what gets compiled. It defaults to the fork branch, until a release carries PR 51's fix.
+  Override it downstream with a nested URL (`inputs.pi-bolt-nix.inputs.pi-bolt-source.url = ...`).
+- `nix/runtime.json`: the runtime per release version, with its engine stamp and each platform's release-asset hash. The
+  runtime is about an hour and 40 GB to build, so it is fetched, not built.
+
+The compile checks that the source's engine (`scripts/runtime-stamp.sh`) is the runtime's. A source that changes webkit, bun,
+or their patches fails with the stamp it needs, and that runtime must be added to `nix/runtime.json` first.
+
+A source build does not rebuild the runtime. Adding a release means adding its entry to `nix/runtime.json`.
 
 ## Plugins
 

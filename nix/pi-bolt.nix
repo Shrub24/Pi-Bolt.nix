@@ -23,6 +23,9 @@ args@{
   libxcb,
   ripgrep,
   fd,
+  # The release whose version selects the runtime (nix/runtime.json) and whose tag names it.
+  release,
+  # What gets compiled. By default the release's source; override it to build another source with the same engine.
   source,
   piBoltPlugins,
 
@@ -43,19 +46,22 @@ args@{
 stdenvNoCC.mkDerivation (
   finalAttrs:
   let
-    runtimePin = lib.importJSON ./runtime.json;
+    releaseVersion = lib.removeSuffix "\n" (builtins.readFile "${release.outPath}/VERSION");
+    runtimes = lib.importJSON ./runtime.json;
+    runtimePin =
+      runtimes.${releaseVersion} or (throw "pi-bolt: no runtime recorded for release ${releaseVersion}: add it to nix/runtime.json");
     system = stdenv.hostPlatform.system;
     pin =
       runtimePin.platforms.${system} or (throw "pi-bolt: no Nix build for ${system} yet");
     runtime = fetchurl {
-      url = "https://github.com/opensec-git/Pi-Bolt/releases/download/${runtimePin.release}/${pin.name}";
+      url = "https://github.com/opensec-git/Pi-Bolt/releases/download/bolt-v${releaseVersion}/${pin.name}";
       inherit (pin) sha256;
     };
 
     sources = callPackage ./source.nix { inherit source; };
 
-    # The release's version. The derivations that make the executable are named by it alone, so that a commit which changes
-    # no build input leaves their store paths, and the caches that hold them, as they were.
+    # The version of the source compiled. The derivations that make the executable are named by it alone, so that a commit which
+    # changes no build input leaves their store paths, and the caches that hold them, as they were.
     version = lib.removeSuffix "\n" (builtins.readFile "${source.outPath}/VERSION");
     # The launcher alone also names the source's revision, so that a build from a branch is not labelled as the release.
     label = "${version}-${source.shortRev or "dirty"}";
@@ -183,6 +189,12 @@ stdenvNoCC.mkDerivation (
         cp -a ${workspace}/. tree
         chmod -R u+w tree
         # The scripts start with /usr/bin/env, which the build sandbox does not have.
+        # The runtime is an engine: a source that changes the engine (webkit, bun, their patches) needs a runtime of its own.
+        # Checked on the store copy: patchShebangs below rewrites the scripts the stamp hashes.
+        [ "$(bash ${sources.compile}/scripts/runtime-stamp.sh)" = ${runtimePin.stamp} ] || {
+          echo "pi-bolt: this source's engine is not release ${releaseVersion}'s (stamp ${runtimePin.stamp}): add its runtime to nix/runtime.json" >&2
+          exit 1
+        }
         patchShebangs tree/scripts
 
         mkdir runtime
@@ -207,7 +219,7 @@ stdenvNoCC.mkDerivation (
         mkdir -p $out/lib
         PIBOLT_WORK=$TMPDIR/work \
           PIBOLT_BUN=$PWD/runtime/bun \
-          PIBOLT_RUNTIME_STAMP=${runtimePin.runtimeStamp} \
+          PIBOLT_RUNTIME_STAMP=${runtimePin.stamp} \
           ./tree/scripts/build-pi.sh --cpu baseline --jit ${if jit then "on" else "off"} \
           ${lib.optionalString (plugins != [ ]) "--plugins $PWD/plugins/plugins.ts ${lib.concatStringsSep " " workers}"} \
           --out $out/lib/pi-bolt

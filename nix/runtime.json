@@ -1,14 +1,15 @@
 {
-  "release": "bolt-v0.9.4",
-  "runtimeStamp": "238fc9355d5cdab8",
-  "platforms": {
-    "x86_64-linux": {
-      "name": "pi-bolt-runtime-linux-x64.tar.gz",
-      "sha256": "07b3ee40868d62700e28c070c371ad10562c9889abf95c611207308dc64ffd2e"
-    },
-    "aarch64-linux": {
-      "name": "pi-bolt-runtime-linux-arm64.tar.gz",
-      "sha256": "bd90ce075883b44b1d73cced172c7fbe970f0b5d9846e6b363edc96ce24d970b"
+  "0.9.4": {
+    "stamp": "238fc9355d5cdab8",
+    "platforms": {
+      "x86_64-linux": {
+        "name": "pi-bolt-runtime-linux-x64.tar.gz",
+        "sha256": "07b3ee40868d62700e28c070c371ad10562c9889abf95c611207308dc64ffd2e"
+      },
+      "aarch64-linux": {
+        "name": "pi-bolt-runtime-linux-arm64.tar.gz",
+        "sha256": "bd90ce075883b44b1d73cced172c7fbe970f0b5d9846e6b363edc96ce24d970b"
+      }
     }
   }
 }
