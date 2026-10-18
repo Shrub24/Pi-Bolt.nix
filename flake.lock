@@ -1,0 +1,45 @@
+{
+  "nodes": {
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1792094642,
+        "narHash": "sha256-zp8ToDMnqZcu4o4IH9pdwXFXGp7yLm/M0dEnNWnyd7I=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "fe13242281a67641c0102cdb1087f0ebe586c7df",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "pi-bolt": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1792296601,
+        "narHash": "sha256-eoduily2j+/v5KVg/t7DaVcHKUPusGzJPuk/4+JfLLE=",
+        "owner": "Shrub24",
+        "repo": "Pi-Bolt",
+        "rev": "1a4cd2fe9e5cbbf052090855e4aa4e472b7c2724",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Shrub24",
+        "ref": "fix/compiled-plugin-host-modules",
+        "repo": "Pi-Bolt",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "nixpkgs": "nixpkgs",
+        "pi-bolt": "pi-bolt"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
