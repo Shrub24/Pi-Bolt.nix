@@ -77,6 +77,7 @@ stdenvNoCC.mkDerivation (
 
     workspace = callPackage ./workspace.nix {
       src = sources.workspace;
+      lockfileRoot = source.outPath;
       inherit version;
     };
 
