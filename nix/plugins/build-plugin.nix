@@ -16,7 +16,6 @@ lib.extendMkDerivation {
     "pluginName"
     "packageName"
     "dependencies"
-    "libraries"
     "nodeModules"
     "workers"
     "builtin"
@@ -36,9 +35,8 @@ lib.extendMkDerivation {
       packageName ? null,
       # Other plugins (buildPiBoltPlugin) this one imports. Compiled in, each is staged once and shared, registered or not.
       dependencies ? [ ],
-      # npm packages this plugin imports (fetchNpmPackage, or any folder with passthru.packageName).
-      libraries ? [ ],
-      # A ready node_modules folder (e.g. "${deps}/node_modules"), merged under the libraries.
+      # A ready node_modules folder for the npm packages the plugin imports, as
+      # importNpmLock.buildNodeModules makes it: "${deps}/node_modules".
       nodeModules ? null,
       # External programs this plugin needs at run time; dependencies' programs are included too.
       runtimeInputs ? [ ],
@@ -51,10 +49,6 @@ lib.extendMkDerivation {
       ...
     }:
     let
-      libraryName =
-        library:
-        library.packageName or library.passthru.packageName
-          or (throw "buildPiBoltPlugin ${finalAttrs.pname}: library ${library.name or "?"} has no packageName");
       depInfo =
         dep:
         dep.piBolt
@@ -98,11 +92,6 @@ lib.extendMkDerivation {
           mkdir -p $out/node_modules
           cp -rL --no-preserve=mode ${nodeModules}/. $out/node_modules/
         ''}
-        ${lib.concatMapStrings (library: ''
-          rm -rf $out/node_modules/${libraryName library}
-          mkdir -p $out/node_modules/${libraryName library}
-          cp -rL --no-preserve=mode ${library}/. $out/node_modules/${libraryName library}/
-        '') libraries}
         ${lib.concatMapStrings linkDependency dependencies}
         # Pi provides its packages: a copy here would be a second Pi.
         rm -rf $out/node_modules/@earendil-works/pi-* $out/node_modules/typebox

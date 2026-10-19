@@ -31,9 +31,8 @@ piBoltPlugins.buildPiBoltPlugin {
 | `entry` | The file, relative to the plugin's root, whose default export is the extension. |
 | `patches` | Patch files applied to the plugin's tree. Paths are relative to the plugin's root. |
 | `postPatch` | Shell run after the patches, in the plugin's root. |
-| `libraries` | npm packages it imports, from `piBoltPlugins.fetchNpmPackage`. |
 | `dependencies` | Other plugins it imports, by their `packageName`. |
-| `nodeModules` | A ready `node_modules` folder. Its packages are merged under `libraries`. |
+| `nodeModules` | A ready `node_modules` folder for the npm packages it imports. |
 | `runtimeInputs` | Programs it needs on `PATH`. Those of its dependencies are included. |
 | `pluginName` | The name for `builtin:<name>`. Defaults to `pname`. |
 | `packageName` | The name other plugins import it by: its `package.json` `name`. |
@@ -41,6 +40,16 @@ piBoltPlugins.buildPiBoltPlugin {
 | `builtin` | Whether it is a built-in extension (`builtin:<name>`), replaceable by an extension of the same tools loaded at run time. `false` compiles it in as an unnamed extension instead. Defaults to `true`. |
 
 Pi provides its own packages (`@earendil-works/pi-*` and `typebox`); the builder removes any copy a plugin brings.
+
+A plugin that imports an npm package needs it in that plugin's own `node_modules`. Build the folder from a lockfile, as
+nixpkgs' `importNpmLock` does (`importNpmLock` and `nodejs` are from `pkgs`), and pass it:
+
+```nix
+piBoltPlugins.buildPiBoltPlugin {
+  # ...
+  nodeModules = "${importNpmLock.buildNodeModules { npmRoot = ./.; inherit nodejs; }}/node_modules";
+}
+```
 
 ### Patching
 
@@ -109,6 +118,11 @@ pkgs.runCommand "pi-bolt-with-plugin" { nativeBuildInputs = [ pkgs.makeBinaryWra
 
 Add programs to Pi with `runtimeInputs`, not with Home Manager's `extraPackages`. Home Manager wraps only Pi's own `bin/pi`
 inside a new store path, so the command you run is not the package's.
+
+`pi-bolt doctor` labels a launcher as this installation only when it is in the executable's folder: Pi compares the launcher's
+folder with the executable's, not the store path. A wrapper in your own `bin/` is reported as `not this Pi-Bolt`, which costs
+nothing but the label. To have it reported as this one, put the wrapper beside the executable in a copy of `lib/pi-bolt`, and
+link the names in `bin/` to it.
 
 ## Known limitations
 

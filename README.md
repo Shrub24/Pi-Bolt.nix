@@ -49,8 +49,8 @@ package = pkgs.pi-bolt.withPlugins (ps: [ ps.word-count ]);
 `-builtin:<name>` in settings turns one off.
 
 Pi-Bolt is built from source on your machine, which takes several minutes. It follows this flake's `nixpkgs` unless you follow
-yours, which keeps one nixpkgs in the closure at the cost of cache hits: the dependencies then build against your nixpkgs rather
-than the one this flake pins.
+yours; following yours keeps one nixpkgs in the closure, but the workspace and the executable then hash differently from this
+flake's, so a cache of its builds cannot serve them.
 
 ## Packages
 

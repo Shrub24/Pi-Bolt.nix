@@ -6,6 +6,16 @@ A Pi-Bolt executable is built from two things:
 - **The runtime**: the JavaScript engine the executable runs on (a patched Bun and WebKit). It takes about 1 hour 40 minutes
   and 40 GB to build, so the flake downloads it from the release instead.
 
+The build has four layers, each its own derivation:
+
+- the runtime, fetched from the release;
+- the workspace: Pi's npm dependencies and its own build (`npm run build:offline`);
+- the compile: one executable, named for the source, the JIT mode, the AOT size limit and the plugin set;
+- the launcher: a wrapper that adds `PATH` and does not touch the command line.
+
+The first two are the same for every variant of a release, which is what makes them worth caching. A build against a different
+`nixpkgs` hashes differently and can use neither.
+
 ## Which release is built
 
 The `pi-bolt` input is a Pi-Bolt release tag, such as `bolt-v0.9.5`. Its `VERSION` names the version, and `nix/runtime.json`

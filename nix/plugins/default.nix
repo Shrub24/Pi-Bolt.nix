@@ -16,7 +16,6 @@
 }:
 lib.makeScope newScope (self: {
   buildPiBoltPlugin = self.callPackage ./build-plugin.nix { };
-  fetchNpmPackage = self.callPackage ./fetch-npm-package.nix { };
 
   # Pi-Bolt's examples/plugins: the /words command (docs/PLUGINS.md).
   word-count = self.buildPiBoltPlugin {
