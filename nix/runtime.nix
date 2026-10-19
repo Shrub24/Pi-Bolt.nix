@@ -1,31 +1,49 @@
-# The Pi-Bolt runtime: the patched Bun and WebKit that the executable links, released as a binary per platform.
-# `nix run .#update-runtime -- <version>` moves the version and the hashes (scripts/update-runtime.sh, which runs nix-update) and
-# checks them against the release's signed SHA256SUMS.
+# The Pi-Bolt runtime: the patched Bun and WebKit the executable runs on, from the release nix/runtime-data.nix names, unpacked
+# and given this system's dynamic linker. The compile that follows copies it as it is, so the engine is prepared once per system
+# rather than once per executable.
 {
-  fetchurl,
+  lib,
   stdenv,
+  fetchurl,
+  patchelf,
+  callPackage,
 }:
 let
-  version = "0.9.5";
-  assets = {
-    x86_64-linux = {
-      name = "pi-bolt-runtime-linux-x64.tar.gz";
-      hash = "sha256-37XO2ZrMvgVFIKgwnVfuXiNdVtFzIwg4UzBhWbl9CrY=";
-    };
-    aarch64-linux = {
-      name = "pi-bolt-runtime-linux-arm64.tar.gz";
-      hash = "sha256-xnDKgqCU5NyrGlmpfQR8jnJppgIQbdfT7vzM1XevP8U=";
-    };
-  };
+  data = import ./runtime-data.nix;
   asset =
-    assets.${stdenv.hostPlatform.system}
+    data.assets.${stdenv.hostPlatform.system}
       or (throw "pi-bolt-runtime: no release asset for ${stdenv.hostPlatform.system}");
+  updateRuntime = callPackage ./update-runtime.nix { };
 in
-fetchurl {
+stdenv.mkDerivation {
   pname = "pi-bolt-runtime";
-  inherit version;
-  url = "https://github.com/opensec-git/Pi-Bolt/releases/download/bolt-v${version}/${asset.name}";
-  inherit (asset) hash;
-  # The stamp of the release's engine (scripts/runtime-stamp.sh). The executable is built from the same engine, or the build fails.
-  passthru.stamp = "34ccf3c94a5e9606";
+  version = data.version;
+  src = fetchurl {
+    url = "https://github.com/opensec-git/Pi-Bolt/releases/download/bolt-v${data.version}/${asset.name}";
+    inherit (asset) hash;
+  };
+
+  nativeBuildInputs = [ patchelf ];
+  dontConfigure = true;
+  dontBuild = true;
+  # The engine is an AOT image: stripping it or patching its ELF beyond the interpreter below damages it.
+  dontStrip = true;
+  dontPatchELF = true;
+
+  installPhase = ''
+    runHook preInstall
+    mkdir -p $out
+    cp -r . $out/
+    chmod -R u+w $out
+    # The compile links against this, and rewriting the compiled executable afterwards would damage its image.
+    patchelf --set-interpreter ${stdenv.cc.bintools.dynamicLinker} $out/bun
+    runHook postInstall
+  '';
+
+  passthru = {
+    inherit (data) stamp assets;
+    # A shared update workflow runs `nix-update --use-update-script` on this attribute: the version, both platforms' hashes and
+    # the stamp move together, which nix-update on its own cannot do (scripts/update-runtime.sh).
+    updateScript = [ (lib.getExe updateRuntime) ];
+  };
 }

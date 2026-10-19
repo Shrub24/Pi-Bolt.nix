@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
-# Moves the Pi-Bolt runtime (nix/runtime.nix) to a release. nix-update sets the version and the hash of this system's archive,
-# which it downloads and hashes. The other system's hash and the engine stamp come from the release's signed SHA256SUMS and
-# RUNTIME_STAMP. Then every value is checked against those sums by evaluation, so nothing is built.
+# Moves the Pi-Bolt runtime in nix/runtime-data.nix to a release: the version, each platform's archive hash, and the engine stamp.
 #
-# The signature is checked against keys/release.pub, this repository's pinned copy of the release key, not the copy in the
-# release.
+# Usage, from the repository root:
+#   nix run .#update-runtime              the newest stable release (this is how nix-update runs it: passthru.updateScript)
+#   nix run .#update-runtime -- 0.9.6     a chosen release
 #
-# Usage, from the repository root: nix run .#update-runtime -- <version>      e.g. ... -- 0.9.6
-# Needs (the flake app provides them): nix, nix-update, curl, OpenSSL 3, sed, awk. Re-running for the recorded version changes
-# nothing.
+# The values come from the release's signed SHA256SUMS and RUNTIME_STAMP, checked against keys/release.pub, this repository's
+# pinned copy of the release key. Nothing is built: the two platform hashes and the stamp move together, and each is compared
+# with the signed sums by evaluation afterwards. The `pi-bolt` input's tag is a separate step (docs/RELEASES.md).
 set -euo pipefail
-[ -f nix/runtime.nix ] && [ -f keys/release.pub ] || {
+[ -f nix/runtime-data.nix ] && [ -f keys/release.pub ] || {
 	echo "update-runtime: run it from the repository root" >&2
 	exit 1
 }
@@ -20,21 +19,27 @@ die() {
 	exit 1
 }
 
-[ $# -eq 1 ] || die "usage: $0 <version>"
-version="$1"
-[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "the version is X.Y.Z, not $version"
-
-# The release asset each Nix system uses.
+# The runtime archive each Nix system uses.
 declare -A assets=(
 	[x86_64-linux]=pi-bolt-runtime-linux-x64.tar.gz
 	[aarch64-linux]=pi-bolt-runtime-linux-arm64.tar.gz
 )
-native="$(nix eval --impure --raw --expr builtins.currentSystem)"
-[ -n "${assets[$native]:-}" ] || die "there is no runtime asset for $native"
-other=
-for system in "${!assets[@]}"; do
-	[ "$system" = "$native" ] || other="$system"
-done
+
+if [ $# -gt 1 ]; then
+	die "usage: $0 [version]"
+elif [ $# -eq 1 ]; then
+	version="$1"
+else
+	# The newest stable release. The tag scheme is bolt-vX.Y.Z, and a prerelease is not a release.
+	version="$(
+		curl -fsSL "https://api.github.com/repos/opensec-git/Pi-Bolt/releases?per_page=100" |
+			jq -r '[.[]
+			        | select((.prerelease | not) and (.tag_name | test("^bolt-v[0-9]+\\.[0-9]+\\.[0-9]+$")))
+			        | .tag_name | sub("^bolt-v"; "")]
+			       | sort_by(split(".") | map(tonumber)) | last // empty'
+	)" || die "cannot read the list of releases"
+fi
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "the version is X.Y.Z, not '$version'"
 
 openssl version | grep -q '^OpenSSL 3' || die "OpenSSL 3 is needed to check the release's signature"
 base="https://github.com/opensec-git/Pi-Bolt/releases/download/bolt-v$version"
@@ -59,26 +64,42 @@ stamp="$(tr -d '\n' <"$tmp/RUNTIME_STAMP")"
 [[ "$stamp" =~ ^[0-9a-f]{16}$ ]] || die "RUNTIME_STAMP is not a 16-digit hex stamp: $stamp"
 [ "$(sha256sum "$tmp/RUNTIME_STAMP" | cut -d' ' -f1)" = "$(sum_of RUNTIME_STAMP)" ] || die "checksum mismatch for RUNTIME_STAMP"
 
-nix-update --flake --system "$native" --version "$version" "packages.$native.pi-bolt-runtime"
-
-# The other system's hash, from the signed sums: nix-update would need a builder for that system to fetch it.
-sri="$(nix hash convert --hash-algo sha256 --to sri "$(sum_of "${assets[$other]}")")"
-awk -v name="${assets[$other]}" -v hash="$sri" '
-	index($0, "name = \"" name "\";") { found = 1 }
-	found && /hash = / { sub(/hash = "[^"]*"/, "hash = \"" hash "\""); found = 0 }
+# One pass over the file: the version, the stamp, and each archive's hash, which is keyed by the asset name beside it.
+awk -v version="$version" -v stamp="$stamp" \
+	-v name_x86="${assets[x86_64-linux]}" -v hash_x86="$(nix hash convert --hash-algo sha256 --to sri "$(sum_of "${assets[x86_64-linux]}")")" \
+	-v name_arm="${assets[aarch64-linux]}" -v hash_arm="$(nix hash convert --hash-algo sha256 --to sri "$(sum_of "${assets[aarch64-linux]}")")" '
+	/^  version = "/ { sub(/"[^"]*"/, "\"" version "\""); print; next }
+	/^  stamp = "/ { sub(/"[^"]*"/, "\"" stamp "\""); print; next }
+	/^      name = "/ {
+		name = $0
+		sub(/^      name = "/, "", name)
+		sub(/";$/, "", name)
+		print
+		next
+	}
+	/^      hash = "/ && name != "" {
+		hash = (name == name_x86) ? hash_x86 : ((name == name_arm) ? hash_arm : "")
+		if (hash == "") {
+			print "update-runtime: there is no hash for " name > "/dev/stderr"
+			exit 1
+		}
+		sub(/"[^"]*"/, "\"" hash "\"")
+		name = ""
+		print
+		next
+	}
 	{ print }
-' nix/runtime.nix >"$tmp/runtime.nix"
-mv "$tmp/runtime.nix" nix/runtime.nix
+' nix/runtime-data.nix >"$tmp/runtime-data.nix" || die "cannot rewrite nix/runtime-data.nix"
+mv "$tmp/runtime-data.nix" nix/runtime-data.nix
 
-sed -i "s|passthru.stamp = \"[0-9a-f]*\";|passthru.stamp = \"$stamp\";|" nix/runtime.nix
-
-# Every system's runtime, as the flake evaluates it, must be the release's.
+# What the file now says, as the flake evaluates it, is what the release's signed sums say.
 for system in "${!assets[@]}"; do
 	attr="packages.$system.pi-bolt-runtime"
-	[ "$(nix eval --raw ".#$attr.version")" = "$version" ] || die "$system: the runtime's version is not $version"
-	[ "$(nix eval --raw ".#$attr.passthru.stamp")" = "$stamp" ] || die "$system: the runtime's stamp is not $stamp"
-	got="$(nix hash convert --hash-algo sha256 --to base16 "$(nix eval --raw ".#$attr.outputHash")")"
-	[ "$got" = "$(sum_of "${assets[$system]}")" ] || die "$system: the runtime's hash is not the release's SHA256SUMS entry"
+	[ "$(nix eval --raw ".#$attr.version")" = "$version" ] || die "$system: the version is not $version"
+	[ "$(nix eval --raw ".#$attr.passthru.stamp")" = "$stamp" ] || die "$system: the stamp is not $stamp"
+	sri="$(nix eval --raw ".#$attr.passthru.assets.$system.hash")" || die "$system: cannot read the runtime's hash"
+	[ "$(nix hash convert --hash-algo sha256 --to base16 "$sri")" = "$(sum_of "${assets[$system]}")" ] ||
+		die "$system: the hash is not the release's SHA256SUMS entry"
 done
 
-echo "runtime set to $version (stamp $stamp) in nix/runtime.nix"
+echo "runtime set to $version (stamp $stamp) in nix/runtime-data.nix"

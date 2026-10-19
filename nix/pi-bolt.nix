@@ -14,7 +14,6 @@ args@{
   callPackage,
   python3,
   rsync,
-  patchelf,
   autoPatchelfHook,
   writeText,
   libxcb,
@@ -178,7 +177,6 @@ stdenvNoCC.mkDerivation (
       nativeBuildInputs = [
         python3
         rsync
-        patchelf
         autoPatchelfHook
       ];
       # The native module Pi's TUI loads to read the keyboard's modifiers under X11.
@@ -201,11 +199,9 @@ stdenvNoCC.mkDerivation (
         # The scripts start with /usr/bin/env, which the build sandbox does not have.
         patchShebangs tree/scripts
 
-        mkdir runtime
-        tar -xzf ${runtime} -C runtime --strip-components=1
+        # The runtime derivation ships the engine unpacked and linked to this system's loader.
+        cp -r ${runtime} runtime
         chmod -R u+w runtime
-        # Before compiling: rewriting the compiled executable would damage its AOT image.
-        patchelf --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" runtime/bun
 
         ${lib.optionalString (finalAttrs.plugins != [ ]) ''
           mkdir plugins
@@ -276,10 +272,7 @@ stdenvNoCC.mkDerivation (
         lib.licenses.lgpl2Plus
         lib.licenses.bsd2
       ];
-      platforms = [
-        "x86_64-linux"
-        "aarch64-linux"
-      ];
+      platforms = builtins.attrNames runtime.passthru.assets;
       # The executable is compiled here from source; the runtime it links (Pi-Bolt's patched Bun, WebKit) is released as a binary.
       sourceProvenance = [
         lib.sourceTypes.fromSource

@@ -25,10 +25,8 @@
       pi-bolt-source,
     }:
     let
-      systems = [
-        "x86_64-linux"
-        "aarch64-linux"
-      ];
+      # The platforms are the runtime's (nix/runtime-data.nix), so there is one list and not three.
+      systems = builtins.attrNames (import ./nix/runtime-data.nix).assets;
       forAllSystems =
         f:
         nixpkgs.lib.genAttrs systems (
@@ -49,7 +47,7 @@
         default = pkgs.pi-bolt;
         inherit (pkgs) pi-bolt;
         pi-bolt-jit = pkgs.pi-bolt.override { jit = true; };
-        # The release's runtime: nix-update moves its version and hash, and scripts/update-runtime.sh checks them.
+        # The release's runtime: one version drives two platform hashes and the stamp (scripts/update-runtime.sh).
         inherit (pkgs) pi-bolt-runtime;
       });
 
@@ -70,22 +68,8 @@
       apps = forAllSystems (pkgs: {
         update-runtime = {
           type = "app";
-          program = nixpkgs.lib.getExe (
-            pkgs.writeShellApplication {
-              name = "update-runtime";
-              runtimeInputs = [
-                pkgs.nix
-                pkgs.nix-update
-                pkgs.coreutils
-                pkgs.curl
-                pkgs.gawk
-                pkgs.gnused
-                pkgs.openssl
-              ];
-              text = ''exec bash ${./scripts/update-runtime.sh} "$@"'';
-            }
-          );
-          meta.description = "Move the runtime to a Pi-Bolt release: nix-update for the version, then the signature and hashes checked";
+          program = nixpkgs.lib.getExe (pkgs.callPackage ./nix/update-runtime.nix { });
+          meta.description = "Move the runtime to a Pi-Bolt release: the version, both platforms' hashes and the engine stamp";
         };
       });
 
