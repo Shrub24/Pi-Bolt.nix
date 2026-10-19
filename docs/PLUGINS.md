@@ -96,33 +96,65 @@ from the interpreter. A plugin of 288,350 bytes, for example, needs a limit of 5
 
 A higher limit makes the compile take minutes and tens of gigabytes.
 
+## Built-in extensions
+
+Pi-Bolt compiles in its own extensions, and `pi-bolt doctor` lists them as `compiled in`:
+
+- `llama.cpp`, `codemode`, `tool-search` and `mcp` load at start. `codemode`, `tool-search` and `mcp` are replaceable: an
+  extension that registers the same tools, or `/mcp`, takes over from them.
+- `herdr` loads only in a Herdr pane (`HERDR_ENV=1` with a pane id). It then reports pane state to Herdr in place of Herdr's own
+  Pi integration.
+
+Disable one with `-builtin:<name>` in the `extensions` setting. Do not run two publishers of pane state at once: `herdr` and
+another extension that reports the same pane metadata.
+
 ## Loading at run time
 
-A plugin's `extensionPath` is its entry file in the store:
+A plugin can be loaded without being compiled in: pass its entry file to `-e`.
 
 ```sh
 pi -e ${plugin.extensionPath}
 ```
 
-A plugin loaded this way needs its `runtimeInputs` on `PATH`, which the compiled executable does not set for it. A launcher that
-loads it adds them (`plugin` is the `buildPiBoltPlugin` derivation, `lib` is `nixpkgs.lib`):
-
-```nix
-pkgs.runCommand "pi-bolt-with-plugin" { nativeBuildInputs = [ pkgs.makeBinaryWrapper ]; } ''
-  mkdir -p $out/bin
-  makeBinaryWrapper ${lib.getExe pkgs.pi-bolt} $out/bin/pi-bolt \
-    --prefix PATH : ${lib.makeBinPath plugin.piBolt.runtimeInputs} \
-    --add-flag -e --add-flag ${plugin.extensionPath}
-''
-```
+`-e` is a flag, so it belongs to the launcher that runs Pi, and it must not come before a subcommand: `pi-bolt -e <path> doctor`
+reads `doctor` as a prompt. A plugin loaded this way needs its `runtimeInputs` on `PATH`, which the compiled executable does not set
+for it: put them on `PATH` in the same launcher.
 
 Add programs to Pi with `runtimeInputs`, not with Home Manager's `extraPackages`. Home Manager wraps only Pi's own `bin/pi`
 inside a new store path, so the command you run is not the package's.
 
-`pi-bolt doctor` labels a launcher as this installation only when it is in the executable's folder: Pi compares the launcher's
-folder with the executable's, not the store path. A wrapper in your own `bin/` is reported as `not this Pi-Bolt`, which costs
-nothing but the label. To have it reported as this one, put the wrapper beside the executable in a copy of `lib/pi-bolt`, and
-link the names in `bin/` to it.
+## Launchers
+
+`pkgs.pi-bolt.mkLauncher` writes one launcher script. It sets the environment and `PATH` it is given, then runs the `pi` beside
+it. It takes no flags, because a flag before the user's arguments changes which subcommand Pi takes; flags belong to the caller.
+
+```nix
+pkgs.pi-bolt.mkLauncher {
+  name = "pi-bolt-lead";                      # default: pi-bolt
+  env.PI_CODING_AGENT_DIR = "/path/to/role";  # the role's config directory
+  path = [ pkgs.fd pkgs.ripgrep ];            # prepended to PATH
+}
+```
+
+The script finds `pi` relative to itself, so it works in any copy of `lib/pi-bolt`. To install one, copy the package's
+`lib/pi-bolt` into your output, place the launcher beside `pi`, and link `bin/` to it:
+
+```nix
+let
+  lead = pkgs.pi-bolt.mkLauncher { name = "pi-bolt-lead"; env.PI_CODING_AGENT_DIR = "/path/to/role"; };
+in
+pkgs.runCommand "pi-bolt-roles" { } ''
+  mkdir -p $out/lib $out/bin
+  cp -r ${pkgs.pi-bolt.unwrapped}/lib/pi-bolt $out/lib/pi-bolt
+  chmod -R u+w $out/lib/pi-bolt
+  install -m 755 ${lead} $out/lib/pi-bolt/pi-bolt-lead
+  ln -s ../lib/pi-bolt/pi-bolt-lead $out/bin/pi-bolt-lead
+''
+```
+
+`pi-bolt doctor` counts a launcher as this installation only when it is in the executable's folder, which is why the placement
+matters. A launcher in your own `bin/` is reported as `not this Pi-Bolt`, which costs nothing but the label. The flake's
+`launcher` check runs the generated script with a stub `pi`, moved to another directory.
 
 ## Known limitations
 

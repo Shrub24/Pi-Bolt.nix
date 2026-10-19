@@ -3,10 +3,14 @@
 # the release's signed SHA256SUMS gives them. The signature is checked against keys/release.pub, this repository's pinned copy
 # of the release key, not the copy in the release.
 #
-# Usage: scripts/update-runtime.sh <version>      e.g. scripts/update-runtime.sh 0.9.5
-# Needs: curl, OpenSSL 3, python3, sha256sum. Re-running for a recorded version checks it and changes nothing.
+# Usage, from the repository root: nix run .#update-runtime -- <version>      e.g. ... -- 0.9.5
+# Needs (the flake app provides them): curl, OpenSSL 3, python3, sha256sum. Re-running for a recorded version checks it and
+# changes nothing.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+[ -f nix/runtime.json ] && [ -f keys/release.pub ] || {
+	echo "update-runtime: run it from the repository root" >&2
+	exit 1
+}
 
 die() {
 	echo "update-runtime: $*" >&2

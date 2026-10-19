@@ -59,12 +59,12 @@ flake's, so a cache of its builds cannot serve them.
 | `packages.<system>.pi-bolt` | Pi-Bolt, baseline CPU |
 | `packages.<system>.pi-bolt-jit` | Pi-Bolt with the JIT |
 
-The overlay also provides `pkgs.pi-bolt.withPlugins`, `pkgs.piBoltPlugins` and `pkgs.pi-bolt.unwrapped` (the executable,
-without its launcher).
+The overlay also provides `pkgs.pi-bolt.withPlugins`, `pkgs.piBoltPlugins`, `pkgs.pi-bolt.unwrapped` (the executable, without
+its launcher) and `pkgs.pi-bolt.mkLauncher` (a launcher with its own environment and `PATH`; see [Plugins](docs/PLUGINS.md#launchers)).
 
 ## Documentation
 
-- [Plugins](docs/PLUGINS.md): building, patching, and compiling in or loading plugins
+- [Plugins](docs/PLUGINS.md): building, patching, compiling in or loading plugins, built-in extensions, and launchers
 - [Releases and runtimes](docs/RELEASES.md): which release is built, building from another source, and adding a release
 
 ## Checks

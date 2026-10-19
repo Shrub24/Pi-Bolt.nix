@@ -53,10 +53,32 @@
       checks = forAllSystems (pkgs: {
         # The plugin contract: compiled in, and loaded from the store.
         plugins = pkgs.callPackage ./nix/tests { };
+        # The launcher generator: env, PATH and argv, and that the launcher still finds pi when moved.
+        launcher = pkgs.callPackage ./nix/tests/launcher.nix { };
         # The JIT build, which no package output builds on its own.
         jit = pkgs.pi-bolt.override { jit = true; };
         # The word-count example from Pi-Bolt's examples/plugins, compiled in.
         pi-bolt-example = pkgs.pi-bolt.withPlugins (ps: [ ps.word-count ]);
+      });
+
+      # Run from the repository root: it edits nix/runtime.json there.
+      apps = forAllSystems (pkgs: {
+        update-runtime = {
+          type = "app";
+          program = nixpkgs.lib.getExe (
+            pkgs.writeShellApplication {
+              name = "update-runtime";
+              runtimeInputs = [
+                pkgs.coreutils
+                pkgs.curl
+                pkgs.openssl
+                pkgs.python3
+              ];
+              text = ''exec bash ${./scripts/update-runtime.sh} "$@"'';
+            }
+          );
+          meta.description = "Record a Pi-Bolt release's runtime in nix/runtime.json, after checking its signature";
+        };
       });
 
       formatter = forAllSystems (pkgs: pkgs.nixfmt-tree);

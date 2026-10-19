@@ -65,7 +65,7 @@ pkgs.pi-bolt.override { checkRuntimeStamp = false; }
 1. Record the release's runtime:
 
    ```sh
-   scripts/update-runtime.sh 0.9.6
+   nix run .#update-runtime -- 0.9.6     (from the repository root)
    ```
 
    The script downloads the release's `SHA256SUMS`, its signature, `RUNTIME_STAMP` and the runtime archives. It checks the

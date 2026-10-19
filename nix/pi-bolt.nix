@@ -17,7 +17,6 @@ args@{
   rsync,
   patchelf,
   autoPatchelfHook,
-  makeBinaryWrapper,
   writeText,
   libxcb,
   ripgrep,
@@ -254,6 +253,9 @@ stdenvNoCC.mkDerivation (
       runtimeInputs ++ lib.concatMap (plugin: plugin.piBolt.runtimeInputs) finalAttrs.plugins
     );
 
+    mkLauncher = callPackage ./launcher.nix { };
+    defaultLauncher = mkLauncher { path = toolInputs; };
+
     meta = {
       description = "Pi, the coding agent, compiled ahead of time";
       homepage = "https://github.com/opensec-git/Pi-Bolt";
@@ -280,19 +282,15 @@ stdenvNoCC.mkDerivation (
     inherit plugins;
 
     dontUnpack = true;
-    nativeBuildInputs = [ makeBinaryWrapper ];
 
     installPhase = ''
       runHook preInstall
       mkdir -p $out/lib $out/bin
       cp -r ${unwrapped}/lib/pi-bolt $out/lib/pi-bolt
       chmod -R u+w $out/lib/pi-bolt
-      # A binary wrapper costs one exec and leaves process.execPath alone, so the assets beside it still resolve. It goes beside
-      # the executable, not in bin/: `pi-bolt doctor` calls this installation its own only when the launcher on PATH resolves to
-      # the executable's folder.
-      # PATH only: the package does not touch argv, so a launch is Pi's own.
-      makeBinaryWrapper $out/lib/pi-bolt/pi $out/lib/pi-bolt/pi-bolt \
-        ${lib.optionalString (toolInputs != [ ]) "--prefix PATH : ${lib.makeBinPath toolInputs}"}
+      # Beside the executable, not in bin/: `pi-bolt doctor` calls this installation its own only when the launcher on PATH
+      # resolves to the executable's folder. The launcher sets PATH and passes argv through unchanged.
+      install -m 755 ${defaultLauncher} $out/lib/pi-bolt/pi-bolt
       ln -s ../lib/pi-bolt/pi-bolt $out/bin/pi-bolt
       ln -s ../lib/pi-bolt/pi-bolt $out/bin/pi
       runHook postInstall
@@ -313,6 +311,13 @@ stdenvNoCC.mkDerivation (
         echo "doctor does not report this installation as its own:"$'\n'"$doctor" >&2
         exit 1
       }
+      # Each compiled-in plugin is in the executable: doctor lists it as builtin:<name>.
+      ${lib.concatMapStrings (plugin: ''
+        tr ', ' '\n\n' <<< "$doctor" | grep -qxF ${lib.escapeShellArg "builtin:${plugin.piBolt.name}"} || {
+          echo "doctor does not list builtin:${plugin.piBolt.name}" >&2
+          exit 1
+        }
+      '') (lib.filter (plugin: plugin.piBolt.builtin) finalAttrs.plugins)}
       runHook postInstallCheck
     '';
 
@@ -320,6 +325,8 @@ stdenvNoCC.mkDerivation (
       inherit unwrapped;
       plugins = finalAttrs.plugins;
       runtimeInputs = toolInputs;
+      # The launcher generator the package's own launcher is built with: consumers' launchers are calls to it.
+      inherit mkLauncher;
       # Through callPackage again, so that the result carries `override` too: `(pi-bolt.withPlugins f).override { jit = true; }`.
       withPlugins = select: callPackage ./pi-bolt.nix (args // { plugins = select piBoltPlugins; });
     };
