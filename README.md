@@ -38,16 +38,20 @@ With the overlay (`overlays.default`), `pkgs.pi-bolt`, `pkgs.pi-bolt.withPlugins
 
 ## Release, source and runtime
 
-- `pi-bolt` (input): the release, `bolt-v0.9.4`. Its `VERSION` selects the runtime, and its tag names the release.
-- `pi-bolt-source` (input): what gets compiled. It defaults to the fork branch, until a release carries PR 51's fix.
-  Override it downstream with a nested URL (`inputs.pi-bolt-nix.inputs.pi-bolt-source.url = ...`).
-- `nix/runtime.json`: the runtime per release version, with its engine stamp and each platform's release-asset hash. The
-  runtime is about an hour and 40 GB to build, so it is fetched, not built.
+- `pi-bolt` (input): the release, `bolt-vX.Y.Z`. Its `VERSION` selects the runtime, and its tag names the release.
+- `pi-bolt-source` (input): what gets compiled. It follows `pi-bolt`. To compile another source (a fork branch, say), follow
+  your own input: `inputs.pi-bolt-nix.inputs.pi-bolt-source.follows = "<your input>"`.
+- `nix/runtime.json`: the runtime per release version, with its engine stamp and each platform's release-asset hash.
+- `keys/release.pub`: the release key, pinned here. The signature of a release's checksums is checked against it.
+
+Adding a release's runtime is `scripts/update-runtime.sh <version>`. It fetches the release's signed `SHA256SUMS`, checks the
+signature and the archives' hashes, and records the entry in `nix/runtime.json`. Re-running it for a recorded version changes
+nothing.
 
 The compile checks that the source's engine (`scripts/runtime-stamp.sh`) is the runtime's. A source that changes webkit, bun,
-or their patches fails with the stamp it needs, and that runtime must be added to `nix/runtime.json` first.
+or their patches fails with the stamp it needs, and that runtime must be recorded first.
 
-A source build does not rebuild the runtime. Adding a release means adding its entry to `nix/runtime.json`.
+A source build does not rebuild the runtime, which takes about an hour and 40 GB, so it is fetched.
 
 ## Plugins
 

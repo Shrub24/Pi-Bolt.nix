@@ -3,17 +3,14 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    # The release: its VERSION selects the runtime (nix/runtime.json), and it is the default source's identity.
+    # The release: its VERSION selects the runtime (nix/runtime.json), and it is the default source.
     pi-bolt = {
-      url = "github:opensec-git/Pi-Bolt/bolt-v0.9.4";
+      url = "github:opensec-git/Pi-Bolt/bolt-v0.9.5";
       flake = false;
     };
-    # What gets compiled. The fork branch carries the staged-tsconfig fix (opensec-git/Pi-Bolt PR 51) until a release has it.
-    # Downstream: `inputs.pi-bolt-nix.inputs.pi-bolt-source.url = ...` (tested: the consumer's lock then pins that source).
-    pi-bolt-source = {
-      url = "github:Shrub24/Pi-Bolt/fix/compiled-plugin-host-modules";
-      flake = false;
-    };
+    # What gets compiled: the release by default. Downstream, follow your own input, which may be a fork branch:
+    # `inputs.pi-bolt-nix.inputs.pi-bolt-source.follows = "<your input>"` (a nested URL does not override a follows).
+    pi-bolt-source.follows = "pi-bolt";
   };
 
   outputs =

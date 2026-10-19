@@ -19,33 +19,16 @@
     "pi-bolt": {
       "flake": false,
       "locked": {
-        "lastModified": 1792172363,
-        "narHash": "sha256-yJlXsSK6egDbEBGHMt8kxCG1a4JjsFv61vQLXNQnOHM=",
+        "lastModified": 1792370596,
+        "narHash": "sha256-B/EeA30nqHeEyf2/dBvlE2bVPsq3F9289jv7gCUmgDc=",
         "owner": "opensec-git",
         "repo": "Pi-Bolt",
-        "rev": "d82b859e811602994f482de351d941e2be9b63a5",
+        "rev": "6f3151382a959506044328f90addbb02d781490a",
         "type": "github"
       },
       "original": {
         "owner": "opensec-git",
-        "ref": "bolt-v0.9.4",
-        "repo": "Pi-Bolt",
-        "type": "github"
-      }
-    },
-    "pi-bolt-source": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1792296601,
-        "narHash": "sha256-eoduily2j+/v5KVg/t7DaVcHKUPusGzJPuk/4+JfLLE=",
-        "owner": "Shrub24",
-        "repo": "Pi-Bolt",
-        "rev": "1a4cd2fe9e5cbbf052090855e4aa4e472b7c2724",
-        "type": "github"
-      },
-      "original": {
-        "owner": "Shrub24",
-        "ref": "fix/compiled-plugin-host-modules",
+        "ref": "bolt-v0.9.5",
         "repo": "Pi-Bolt",
         "type": "github"
       }
@@ -54,7 +37,9 @@
       "inputs": {
         "nixpkgs": "nixpkgs",
         "pi-bolt": "pi-bolt",
-        "pi-bolt-source": "pi-bolt-source"
+        "pi-bolt-source": [
+          "pi-bolt"
+        ]
       }
     }
   },
