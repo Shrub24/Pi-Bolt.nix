@@ -48,13 +48,16 @@ package = pkgs.pi-bolt.withPlugins (ps: [ ps.word-count ]);
 `ps` is the plugin set, `pkgs.piBoltPlugins`. Compiled-in plugins are built-in extensions: Pi loads them by default, and
 `-builtin:<name>` in settings turns one off.
 
+Pi-Bolt is built from source on your machine, which takes several minutes. It follows this flake's `nixpkgs` unless you follow
+yours, which keeps one nixpkgs in the closure at the cost of cache hits: the dependencies then build against your nixpkgs rather
+than the one this flake pins.
+
 ## Packages
 
 | Output | Contents |
 | --- | --- |
 | `packages.<system>.pi-bolt` | Pi-Bolt, baseline CPU |
 | `packages.<system>.pi-bolt-jit` | Pi-Bolt with the JIT |
-| `packages.<system>.pi-bolt-example` | Pi-Bolt with the `word-count` example compiled in |
 
 The overlay also provides `pkgs.pi-bolt.withPlugins`, `pkgs.piBoltPlugins` and `pkgs.pi-bolt.unwrapped` (the executable,
 without its launcher).

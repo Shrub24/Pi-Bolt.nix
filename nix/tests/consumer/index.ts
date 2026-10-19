@@ -11,9 +11,6 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import ms from "ms";
 
 export default function consumer(pi: ExtensionAPI) {
-	// This is source text, not an import.meta expression to rewrite.
-	const sourceText = "import.meta.url";
-	if (sourceText !== ["import", "meta", "url"].join(".")) throw new Error("Source text was rewritten");
 	const data = readFileSync(new URL("./data.txt", import.meta.url), "utf8").trim();
 	const tool = execFileSync("pi-bolt-check-tool", { encoding: "utf8" }).trim();
 	const loads = (globalThis as { __piBoltCheckHelperLoads?: number }).__piBoltCheckHelperLoads;

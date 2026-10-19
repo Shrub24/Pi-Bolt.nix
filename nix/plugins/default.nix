@@ -21,7 +21,6 @@ lib.makeScope newScope (self: {
   # Pi-Bolt's examples/plugins: the /words command (docs/PLUGINS.md).
   word-count = self.buildPiBoltPlugin {
     pname = "word-count";
-    version = "0";
     # Only its own folder, so that the rest of the source does not move it.
     src = builtins.path {
       path = "${source.outPath}/examples/plugins/extensions";

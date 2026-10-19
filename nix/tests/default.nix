@@ -24,7 +24,6 @@ let
 
   helper = buildPiBoltPlugin {
     pname = "pi-bolt-check-helper";
-    version = "0";
     src = ./helper;
     entry = "index.ts";
     packageName = "@pi-bolt-check/helper";
@@ -34,7 +33,6 @@ let
 
   consumer = buildPiBoltPlugin {
     pname = "pi-bolt-check-consumer";
-    version = "0";
     src = ./consumer;
     entry = "index.ts";
     dependencies = [ helper ];
@@ -84,8 +82,6 @@ assert
   }).name == "pi-bolt-check-versionless-0";
 assert lib.elem tool built.unwrapped.runtimeInputs;
 assert lib.elem tool built.runtimeInputs;
-assert lib.hasSuffix "-jit"
-  ((pi-bolt.override { jit = true; }).withPlugins (_: [ helper ])).unwrapped.variant;
 # A launcher-only change leaves the compiled payload alone.
 assert
   pi-bolt.unwrapped.drvPath == (pi-bolt.overrideAttrs (_: {

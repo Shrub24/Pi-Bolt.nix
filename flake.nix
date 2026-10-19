@@ -9,8 +9,12 @@
       flake = false;
     };
     # What gets compiled: the release by default. Downstream, follow your own input, which may be a fork branch:
-    # `inputs.pi-bolt-nix.inputs.pi-bolt-source.follows = "<your input>"` (a nested URL does not override a follows).
-    pi-bolt-source.follows = "pi-bolt";
+    # `inputs.pi-bolt-nix.inputs.pi-bolt-source.follows = "<your input>"` (docs/RELEASES.md).
+    pi-bolt-source = {
+      follows = "pi-bolt";
+      # A source, not a flake: an override that has no flake.nix must still evaluate.
+      flake = false;
+    };
   };
 
   outputs =
@@ -44,12 +48,15 @@
         default = pkgs.pi-bolt;
         inherit (pkgs) pi-bolt;
         pi-bolt-jit = pkgs.pi-bolt.override { jit = true; };
-        # The word-count example from Pi-Bolt's examples/plugins, compiled in.
-        pi-bolt-example = pkgs.pi-bolt.withPlugins (ps: [ ps.word-count ]);
       });
 
       checks = forAllSystems (pkgs: {
+        # The plugin contract: compiled in, and loaded from the store.
         plugins = pkgs.callPackage ./nix/tests { };
+        # The JIT build, which no package output builds on its own.
+        jit = pkgs.pi-bolt.override { jit = true; };
+        # The word-count example from Pi-Bolt's examples/plugins, compiled in.
+        pi-bolt-example = pkgs.pi-bolt.withPlugins (ps: [ ps.word-count ]);
       });
 
       formatter = forAllSystems (pkgs: pkgs.nixfmt-tree);

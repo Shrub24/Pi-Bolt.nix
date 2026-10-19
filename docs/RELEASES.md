@@ -27,11 +27,28 @@ To compile a fork or a branch, follow your own input from your flake:
 }
 ```
 
-A nested URL does not override `pi-bolt-source`, because it follows another input. Follow an input you declare.
+A source with no `flake.nix` of its own (an archive, a source tarball) must be declared as a plain source (`flake = false`), or
+Nix fetches it as a flake and fails. The snippet above does that. A source that has a `flake.nix` works either way.
+
+Instead of declaring an input, the URL can be overridden directly:
+
+```nix
+inputs.pi-bolt-nix.inputs.pi-bolt-source.url = "path:../Pi-Bolt";
+```
+
+`nix ... --override-input pi-bolt-nix/pi-bolt-source path:../Pi-Bolt` does the same for one command, which is the way to build a
+local checkout without editing the flake.
 
 The source must have the same engine as the release. The build runs `scripts/runtime-stamp.sh` on the source. It hashes the
 engine's sources, patches, build scripts and toolchain files, and the script lists them. If the hash differs from the runtime's
 stamp, the build fails and names the stamp it needs. That runtime must be recorded first, as below.
+
+A source that differs only in files which do not affect your system, such as `scripts/build-runtime.ps1`, has a different stamp
+without a different engine. Build it with `checkRuntimeStamp = false`, which warns instead of failing:
+
+```nix
+pkgs.pi-bolt.override { checkRuntimeStamp = false; }
+```
 
 ## Adding a release
 
@@ -50,5 +67,13 @@ stamp, the build fails and names the stamp it needs. That runtime must be record
 
 3. Run `nix flake check`.
 
+A release's entry stays after the next release, so a downstream flake pinning that release's input still resolves. Delete old
+entries when the list gets long.
+
 `keys/release.pub` is this repository's copy of the release key. The script trusts that copy, not a key shipped with the release.
-Replace the file only when the Pi-Bolt project rotates its key.
+Replace the file only when the Pi-Bolt project rotates its key, and check the new key against a release it signed before
+replacing it:
+
+```sh
+openssl dgst -sha256 -verify "$new_key" -signature SHA256SUMS.sig SHA256SUMS
+```

@@ -23,6 +23,7 @@ declare -A assets=(
 	[aarch64-linux]=pi-bolt-runtime-linux-arm64.tar.gz
 )
 
+openssl version | grep -q '^OpenSSL 3' || die "OpenSSL 3 is needed to check the release's signature"
 base="https://github.com/opensec-git/Pi-Bolt/releases/download/bolt-v$version"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -31,7 +32,6 @@ for file in SHA256SUMS SHA256SUMS.sig RUNTIME_STAMP "${assets[@]}"; do
 	curl -fsSL -o "$tmp/$file" "$base/$file" || die "cannot fetch $base/$file"
 done
 
-openssl version | grep -q '^OpenSSL 3' || die "OpenSSL 3 is needed to check the release's signature"
 openssl pkeyutl -verify -pubin -inkey keys/release.pub -rawin -in "$tmp/SHA256SUMS" -sigfile "$tmp/SHA256SUMS.sig" >/dev/null 2>&1 ||
 	die "the signature of SHA256SUMS does not verify against keys/release.pub"
 

@@ -38,13 +38,13 @@ piBoltPlugins.buildPiBoltPlugin {
 | `pluginName` | The name for `builtin:<name>`. Defaults to `pname`. |
 | `packageName` | The name other plugins import it by: its `package.json` `name`. |
 | `workers` | Worker scripts it starts, relative to its root. Each is compiled as an entry point. |
-| `builtin` | Whether it is a built-in extension when compiled in. Defaults to `true`. |
+| `builtin` | Whether it is a built-in extension (`builtin:<name>`), replaceable by an extension of the same tools loaded at run time. `false` compiles it in as an unnamed extension instead. Defaults to `true`. |
 
-Pi provides its own packages (`@earendil-works/pi-*` and `typebox`). A plugin does not bundle them.
+Pi provides its own packages (`@earendil-works/pi-*` and `typebox`); the builder removes any copy a plugin brings.
 
 ### Patching
 
-A patch changes a plugin before it is built, and the patched plugin is what gets compiled in or loaded:
+Patches apply to the plugin's tree before it is built:
 
 ```nix
 piBoltPlugins.buildPiBoltPlugin {
@@ -61,8 +61,7 @@ postPatch = ''
 '';
 ```
 
-Use `--replace-fail`, which fails the build if the text is missing. A patch that stops applying after an upgrade then breaks
-the build, not the running plugin.
+`--replace-fail` fails the build when the text is missing, rather than silently patching nothing.
 
 ## Compiling in
 
@@ -74,7 +73,19 @@ package = pkgs.pi-bolt.withPlugins (ps: [
 ```
 
 `withPlugins` takes a function from the plugin set to a list of plugins. The plugins can come from `piBoltPlugins` or be
-built anywhere. Two plugins with the same `pluginName` are an error.
+built anywhere. Two different plugins with the same `pluginName` fail the build.
+
+## Large modules
+
+The AOT compiler compiles a module only if its top-level bytecode is at most 256 KB (`BUN_JSC_maximumAOTCandidateBytecodeSize`,
+in bytes). A larger module, such as a bundled `dist/index.js` with a big literal, is left out of the compiled image and runs
+from the interpreter. A plugin of 288,350 bytes, for example, needs a limit of 500000:
+
+```nix
+(pi-bolt.override { maxAotCandidateBytecodeSize = 500000; }).withPlugins (_: [ largePlugin ])
+```
+
+A higher limit makes the compile take minutes and tens of gigabytes.
 
 ## Loading at run time
 
@@ -85,7 +96,7 @@ pi -e ${plugin.extensionPath}
 ```
 
 A plugin loaded this way needs its `runtimeInputs` on `PATH`, which the compiled executable does not set for it. A launcher that
-loads it adds them:
+loads it adds them (`plugin` is the `buildPiBoltPlugin` derivation, `lib` is `nixpkgs.lib`):
 
 ```nix
 pkgs.runCommand "pi-bolt-with-plugin" { nativeBuildInputs = [ pkgs.makeBinaryWrapper ]; } ''
@@ -102,5 +113,5 @@ inside a new store path, so the command you run is not the package's.
 ## Known limitations
 
 - A plugin that ships its own `tsconfig.json` overrides the staged one for its own files. Its imports of `@earendil-works/pi-tui`
-  can then resolve to a second copy of that package, so a patch that relies on one shared copy does not apply. Observed for
+  can then resolve to a second copy of that package, so the plugin holds its own copy of `pi-tui`'s classes. Observed for
   `pi-tui` in a Pi-Bolt checkout build.

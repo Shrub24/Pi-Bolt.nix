@@ -2,12 +2,11 @@
 #
 #   pi-bolt                                     this source, compiled for this system
 #   pi-bolt.withPlugins (ps: [ ps.word-count ]) with plugins compiled in (from piBoltPlugins, or built anywhere)
-#   pi-bolt.override { jit = true; }            the JIT build (docs/PLUGINS.md: for extensions loaded at run time)
+#   pi-bolt.override { jit = true; }            the JIT build
 #
-# The executable is made by scripts/build-pi.sh in the source's own tree, from the workspace (nix/workspace.nix: Pi's
-# build) and the runtime that nix/runtime.json names. The compiled executable is `unwrapped`; this package is a copy of it
-# with a launcher that sets PATH, so a launcher change does not compile again, and the launcher and the executable it runs
-# are in one store path (process.execPath is where Pi-Bolt finds its assets).
+# scripts/build-pi.sh builds the executable from the workspace (nix/workspace.nix) and the runtime nix/runtime.json names.
+# This package copies it and adds a PATH launcher, so a launcher change does not recompile, and both sit in one store path:
+# Pi-Bolt finds its assets beside process.execPath.
 args@{
   lib,
   stdenv,
@@ -34,8 +33,11 @@ args@{
   # The JIT build: compiled code as always, and run-time loaded extensions JIT-compiled too.
   jit ? false,
   # The largest module (top-level bytecode, in bytes) the AOT compiler takes. The compiler names the module it refused; raise
-  # this for it (docs/PLUGINS.md, "A large module").
+  # this for it (docs/PLUGINS.md: Large modules).
   maxAotCandidateBytecodeSize ? null,
+  # Fail when the source's engine stamp is not the runtime's. Set false to warn instead: the stamp also covers files that do not
+  # affect this system (scripts/build-runtime.ps1), so a branch that edits only those could not be built otherwise.
+  checkRuntimeStamp ? true,
   # Programs Pi finds in PATH rather than downloading: rg and fd for its grep and find tools. Add wl-clipboard or xclip for
   # the clipboard.
   runtimeInputs ? [
@@ -63,24 +65,20 @@ stdenvNoCC.mkDerivation (
     # The version of the source compiled. The derivations that make the executable are named by it alone, so that a commit which
     # changes no build input leaves their store paths, and the caches that hold them, as they were.
     version = lib.removeSuffix "\n" (builtins.readFile "${source.outPath}/VERSION");
-    # The launcher alone also names the source's revision, so that a build from a branch is not labelled as the release.
-    label = "${version}-${source.shortRev or "dirty"}";
+    # The launcher says whether it is the release, the way nixpkgs labels an unreleased build (0.9.5-unstable-2026-10-19).
+    # lastModifiedDate is Nix's stamp of the input, YYYYMMDDhhmmss.
+    date =
+      let
+        stamp = source.lastModifiedDate or (throw "pi-bolt: the source input has no lastModifiedDate");
+      in
+      "${lib.substring 0 4 stamp}-${lib.substring 4 2 stamp}-${lib.substring 6 2 stamp}";
+    label =
+      if (source.rev or null) == (release.rev or null) then version else "${version}-unstable-${date}";
 
     workspace = callPackage ./workspace.nix {
       src = sources.workspace;
       inherit version;
     };
-
-    # As the release names them (scripts/build-pi.sh, CPU_VARIANT). Every build here is the baseline one: code tuned for its
-    # builder's CPU could not be shared or substituted, and the derivation would have to name that CPU.
-    arch = if system == "x86_64-linux" then "x64" else "arm64";
-    variant =
-      if jit then
-        "${arch}-jit"
-      else if arch == "x64" then
-        "x64-baseline"
-      else
-        arch;
 
     # Deduplicate identical derivations, not names: different patched versions must not silently replace one another.
     closure = builtins.genericClosure {
@@ -108,9 +106,9 @@ stdenvNoCC.mkDerivation (
       map ({ plugin, ... }: plugin) closure;
 
     # Every plugin in the closure is staged once, so a dependency both registered and imported is one copy.
-    isRegistered = plugin: lib.elem (toString plugin) (map toString finalAttrs.plugins);
-    registeredPlugins = lib.filter isRegistered checkedClosure;
-    registeredNames = map (plugin: plugin.piBolt.name) registeredPlugins;
+    registeredPlugins = lib.filter (
+      plugin: lib.elem (toString plugin) (map toString finalAttrs.plugins)
+    ) checkedClosure;
 
     # The manifest scripts/build-pi.sh --plugins reads: the same shape as examples/plugins/plugins.ts.
     manifest = writeText "plugins.ts" (
@@ -128,8 +126,10 @@ stdenvNoCC.mkDerivation (
       + lib.concatStrings (
         lib.imap0 (
           i: plugin:
-          "\t{ name: ${builtins.toJSON plugin.piBolt.name}, factory: plugin_${toString i}, builtin: ${
-            if plugin.piBolt.builtin then "true" else "false"
+          # `{ name, factory }`, as upstream's manifest: build-pi.sh then marks it built-in and replaceable, so an extension of
+          # the same tools loaded at run time replaces it. `builtin: false` opts out.
+          "\t{ name: ${builtins.toJSON plugin.piBolt.name}, factory: plugin_${toString i}${
+            lib.optionalString (!plugin.piBolt.builtin) ", builtin: false"
           } },\n"
         ) registeredPlugins
       )
@@ -188,13 +188,14 @@ stdenvNoCC.mkDerivation (
         chmod -R u+w tree
         cp -a ${workspace}/. tree
         chmod -R u+w tree
-        # The scripts start with /usr/bin/env, which the build sandbox does not have.
-        # The runtime is an engine: a source that changes the engine (webkit, bun, their patches) needs a runtime of its own.
-        # Checked on the store copy: patchShebangs below rewrites the scripts the stamp hashes.
-        [ "$(bash ${sources.compile}/scripts/runtime-stamp.sh)" = ${runtimePin.stamp} ] || {
-          echo "pi-bolt: this source's engine is not release ${releaseVersion}'s (stamp ${runtimePin.stamp}): add its runtime to nix/runtime.json" >&2
-          exit 1
+        # The runtime is an engine: a source that changes it (webkit, bun, their patches) needs a runtime of its own. Checked on
+        # the store copy, since patchShebangs rewrites the scripts the stamp hashes.
+        stamp=$(bash ${sources.compile}/scripts/runtime-stamp.sh)
+        [ "$stamp" = ${runtimePin.stamp} ] || {
+          echo "pi-bolt: this source's engine is not release ${releaseVersion}'s (source stamp $stamp, runtime stamp ${runtimePin.stamp}): add its runtime to nix/runtime.json" >&2
+          ${if checkRuntimeStamp then "exit 1" else ":"}
         }
+        # The scripts start with /usr/bin/env, which the build sandbox does not have.
         patchShebangs tree/scripts
 
         mkdir runtime
@@ -203,7 +204,7 @@ stdenvNoCC.mkDerivation (
         # Before compiling: rewriting the compiled executable would damage its AOT image.
         patchelf --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" runtime/bun
 
-        ${lib.optionalString (plugins != [ ]) ''
+        ${lib.optionalString (finalAttrs.plugins != [ ]) ''
           mkdir plugins
           ${stagePlugins}
           cp ${manifest} plugins/plugins.ts
@@ -217,21 +218,17 @@ stdenvNoCC.mkDerivation (
           export BUN_JSC_maximumAOTCandidateBytecodeSize=${toString maxAotCandidateBytecodeSize}
         ''}
         mkdir -p $out/lib
+        # --cpu baseline: code tuned for the builder's CPU could not be shared or substituted.
         PIBOLT_WORK=$TMPDIR/work \
           PIBOLT_BUN=$PWD/runtime/bun \
           PIBOLT_RUNTIME_STAMP=${runtimePin.stamp} \
           ./tree/scripts/build-pi.sh --cpu baseline --jit ${if jit then "on" else "off"} \
           ${
             lib.optionalString (
-              plugins != [ ]
+              finalAttrs.plugins != [ ]
             ) "--plugins $PWD/plugins/plugins.ts ${lib.concatStringsSep " " workers}"
           } \
           --out $out/lib/pi-bolt
-        echo "Built with Nix: ${variant}${
-          lib.optionalString (
-            registeredNames != [ ]
-          ) ", plugins compiled in: ${lib.concatStringsSep ", " registeredNames}"
-        }" >> $out/lib/pi-bolt/pi-bolt.txt
         runHook postInstall
       '';
 
@@ -243,19 +240,7 @@ stdenvNoCC.mkDerivation (
         autoPatchelf $out/lib/pi-bolt/native
       '';
 
-      doInstallCheck = true;
-      installCheckPhase = ''
-        runHook preInstallCheck
-        # As build-pi.sh checks: it runs, as this version, from its compiled code.
-        said=$(HOME=$TMPDIR BUN_STATIC_HEAP_VERBOSE=1 $out/lib/pi-bolt/pi --version 2>&1)
-        printf '%s\n' "$said"
-        grep -q 'image registered: true' <<< "$said"
-        grep -q 'Pi-Bolt ${version},' <<< "$said"
-        runHook postInstallCheck
-      '';
-
       passthru = {
-        inherit variant;
         plugins = finalAttrs.plugins;
         runtimeInputs = toolInputs;
       };
@@ -271,13 +256,21 @@ stdenvNoCC.mkDerivation (
     meta = {
       description = "Pi, the coding agent, compiled ahead of time";
       homepage = "https://github.com/opensec-git/Pi-Bolt";
-      license = lib.licenses.mit;
+      # Pi-Bolt and Bun are MIT; the bundled WebKit is LGPL-2.0 and BSD-2-Clause per file (THIRD_PARTY_NOTICES.md).
+      license = [
+        lib.licenses.mit
+        lib.licenses.lgpl2Only
+        lib.licenses.bsd2
+      ];
       platforms = [
         "x86_64-linux"
         "aarch64-linux"
       ];
-      # The runtime is Pi-Bolt's patched Bun, released as a binary: it is not built here from source.
-      sourceProvenance = [ lib.sourceTypes.binaryNativeCode ];
+      # The executable is compiled here from source; the runtime it links (Pi-Bolt's patched Bun, WebKit) is released as a binary.
+      sourceProvenance = [
+        lib.sourceTypes.fromSource
+        lib.sourceTypes.binaryNativeCode
+      ];
     };
   in
   {
@@ -293,11 +286,14 @@ stdenvNoCC.mkDerivation (
       mkdir -p $out/lib $out/bin
       cp -r ${unwrapped}/lib/pi-bolt $out/lib/pi-bolt
       chmod -R u+w $out/lib/pi-bolt
-      # A binary wrapper costs one exec and leaves process.execPath alone, so assets still resolve.
+      # A binary wrapper costs one exec and leaves process.execPath alone, so the assets beside it still resolve. It goes beside
+      # the executable, not in bin/: `pi-bolt doctor` calls this installation its own only when the launcher on PATH resolves to
+      # the executable's folder.
       # PATH only: the package does not touch argv, so a launch is Pi's own.
-      makeBinaryWrapper $out/lib/pi-bolt/pi $out/bin/pi-bolt \
+      makeBinaryWrapper $out/lib/pi-bolt/pi $out/lib/pi-bolt/pi-bolt \
         ${lib.optionalString (toolInputs != [ ]) "--prefix PATH : ${lib.makeBinPath toolInputs}"}
-      ln -s pi-bolt $out/bin/pi
+      ln -s ../lib/pi-bolt/pi-bolt $out/bin/pi-bolt
+      ln -s ../lib/pi-bolt/pi-bolt $out/bin/pi
       runHook postInstall
     '';
 
@@ -309,6 +305,13 @@ stdenvNoCC.mkDerivation (
       runHook preInstallCheck
       said=$(HOME=$TMPDIR BUN_STATIC_HEAP_VERBOSE=1 $out/bin/pi --version 2>&1)
       grep -q 'image registered: true' <<< "$said"
+      ${lib.optionalString jit "grep -q 'JIT on' <<< \"$said\""}
+      # The launcher resolves to the executable's own folder, which is what doctor checks (see installPhase).
+      doctor=$(PI_OFFLINE=1 HOME=$TMPDIR PATH=$out/bin:$PATH $out/bin/pi-bolt doctor 2>&1 || true)
+      grep -q '(this Pi-Bolt)' <<< "$doctor" || {
+        echo "doctor does not report this installation as its own:"$'\n'"$doctor" >&2
+        exit 1
+      }
       runHook postInstallCheck
     '';
 
