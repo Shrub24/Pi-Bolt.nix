@@ -49,10 +49,10 @@ stdenvNoCC.mkDerivation (
     releaseVersion = lib.removeSuffix "\n" (builtins.readFile "${release.outPath}/VERSION");
     runtimes = lib.importJSON ./runtime.json;
     runtimePin =
-      runtimes.${releaseVersion} or (throw "pi-bolt: no runtime recorded for release ${releaseVersion}: add it to nix/runtime.json");
+      runtimes.${releaseVersion}
+        or (throw "pi-bolt: no runtime recorded for release ${releaseVersion}: add it to nix/runtime.json");
     system = stdenv.hostPlatform.system;
-    pin =
-      runtimePin.platforms.${system} or (throw "pi-bolt: no Nix build for ${system} yet");
+    pin = runtimePin.platforms.${system} or (throw "pi-bolt: no Nix build for ${system} yet");
     runtime = fetchurl {
       url = "https://github.com/opensec-git/Pi-Bolt/releases/download/bolt-v${releaseVersion}/${pin.name}";
       inherit (pin) sha256;
@@ -221,10 +221,16 @@ stdenvNoCC.mkDerivation (
           PIBOLT_BUN=$PWD/runtime/bun \
           PIBOLT_RUNTIME_STAMP=${runtimePin.stamp} \
           ./tree/scripts/build-pi.sh --cpu baseline --jit ${if jit then "on" else "off"} \
-          ${lib.optionalString (plugins != [ ]) "--plugins $PWD/plugins/plugins.ts ${lib.concatStringsSep " " workers}"} \
+          ${
+            lib.optionalString (
+              plugins != [ ]
+            ) "--plugins $PWD/plugins/plugins.ts ${lib.concatStringsSep " " workers}"
+          } \
           --out $out/lib/pi-bolt
         echo "Built with Nix: ${variant}${
-          lib.optionalString (registeredNames != [ ]) ", plugins compiled in: ${lib.concatStringsSep ", " registeredNames}"
+          lib.optionalString (
+            registeredNames != [ ]
+          ) ", plugins compiled in: ${lib.concatStringsSep ", " registeredNames}"
         }" >> $out/lib/pi-bolt/pi-bolt.txt
         runHook postInstall
       '';

@@ -19,8 +19,7 @@ let
         let
           rel = lib.removePrefix "${root}/" (toString path);
         in
-        rel == root
-        || lib.any (k: rel == k || lib.hasPrefix "${k}/" rel || lib.hasPrefix "${rel}/" k) keep;
+        rel == root || lib.any (k: rel == k || lib.hasPrefix "${k}/" rel || lib.hasPrefix "${rel}/" k) keep;
     };
 
   # What the workspace (Pi's own build) reads: its manifests, the packages, and the one root script the coding agent's build

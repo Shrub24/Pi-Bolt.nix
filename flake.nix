@@ -14,14 +14,22 @@
   };
 
   outputs =
-    { self, nixpkgs, pi-bolt, pi-bolt-source }:
+    {
+      self,
+      nixpkgs,
+      pi-bolt,
+      pi-bolt-source,
+    }:
     let
       systems = [
         "x86_64-linux"
         "aarch64-linux"
       ];
       forAllSystems =
-        f: nixpkgs.lib.genAttrs systems (system: f (nixpkgs.legacyPackages.${system}.extend self.overlays.default));
+        f:
+        nixpkgs.lib.genAttrs systems (
+          system: f (nixpkgs.legacyPackages.${system}.extend self.overlays.default)
+        );
     in
     {
       overlays.default = final: _prev: {

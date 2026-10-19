@@ -1,68 +1,73 @@
 # Pi-Bolt.nix
 
-A Nix flake that builds [Pi-Bolt](https://github.com/opensec-git/Pi-Bolt) from source: Pi, the coding agent, compiled ahead of
-time, with Nix-packaged plugins compiled in.
+A Nix flake that builds [Pi-Bolt](https://github.com/opensec-git/Pi-Bolt), the Pi coding agent compiled ahead of time, with
+Nix-packaged plugins compiled in.
 
-This is unofficial. It is not maintained by the Pi-Bolt project.
+This is unofficial and not maintained by the Pi-Bolt project. It supports Linux on x86_64 and aarch64.
 
-## Use
+## Quickstart
+
+Run it without installing:
+
+```sh
+nix run github:Shrub24/Pi-Bolt.nix -- --version
+```
+
+Install it with Home Manager's `programs.pi-coding-agent`. Add the flake's overlay to the package set your configuration uses,
+which provides `pkgs.pi-bolt`:
 
 ```nix
 {
   inputs.pi-bolt-nix.url = "github:Shrub24/Pi-Bolt.nix";
+  inputs.pi-bolt-nix.inputs.nixpkgs.follows = "nixpkgs";
 
-  outputs = { nixpkgs, pi-bolt-nix, ... }: {
-    # with Home Manager's programs.pi-coding-agent:
-    #   package = pkgs.pi-bolt.withPlugins (ps: [ ps.word-count ]);
+  outputs = { nixpkgs, home-manager, pi-bolt-nix, ... }: let
+    pkgs = nixpkgs.legacyPackages.x86_64-linux.extend pi-bolt-nix.overlays.default;
+  in {
+    homeConfigurations.me = home-manager.lib.homeManagerConfiguration {
+      inherit pkgs;
+      modules = [
+        {
+          programs.pi-coding-agent = {
+            enable = true;
+            package = pkgs.pi-bolt;
+          };
+        }
+      ];
+    };
   };
 }
 ```
 
-With the overlay (`overlays.default`), `pkgs.pi-bolt`, `pkgs.pi-bolt.withPlugins`, `pkgs.piBoltPlugins` and
-`pkgs.pi-bolt.unwrapped` are available.
+To compile plugins in, select them in the package:
 
-| Output | What it is |
+```nix
+package = pkgs.pi-bolt.withPlugins (ps: [ ps.word-count ]);
+```
+
+`ps` is the plugin set, `pkgs.piBoltPlugins`. Compiled-in plugins are built-in extensions: Pi loads them by default, and
+`-builtin:<name>` in settings turns one off.
+
+## Packages
+
+| Output | Contents |
 | --- | --- |
-| `packages.<system>.pi-bolt` | Pi-Bolt, baseline CPU, JIT off |
-| `packages.<system>.pi-bolt-jit` | the JIT build |
-| `packages.<system>.pi-bolt-example` | with the word-count example compiled in |
+| `packages.<system>.pi-bolt` | Pi-Bolt, baseline CPU |
+| `packages.<system>.pi-bolt-jit` | Pi-Bolt with the JIT |
+| `packages.<system>.pi-bolt-example` | Pi-Bolt with the `word-count` example compiled in |
 
-## Layout
+The overlay also provides `pkgs.pi-bolt.withPlugins`, `pkgs.piBoltPlugins` and `pkgs.pi-bolt.unwrapped` (the executable,
+without its launcher).
 
-- `nix/workspace.nix`: Pi's own build (`npm run build:offline` over the root lockfile). It rebuilds only when a file it builds
-  from changes.
-- `nix/pi-bolt.nix`: the compile. `scripts/build-pi.sh --plugins` makes the executable from the workspace, the runtime named in
-  `nix/runtime.json`, and the plugins. Then a launcher that sets `PATH`.
-- `nix/plugins/`: `buildPiBoltPlugin` and `fetchNpmPackage`, and the scope that carries the examples.
-- `nix/tests/`: the plugin contract, compiled in and loaded from the store.
+## Documentation
 
-## Release, source and runtime
-
-- `pi-bolt` (input): the release, `bolt-vX.Y.Z`. Its `VERSION` selects the runtime, and its tag names the release.
-- `pi-bolt-source` (input): what gets compiled. It follows `pi-bolt`. To compile another source (a fork branch, say), follow
-  your own input: `inputs.pi-bolt-nix.inputs.pi-bolt-source.follows = "<your input>"`.
-- `nix/runtime.json`: the runtime per release version, with its engine stamp and each platform's release-asset hash.
-- `keys/release.pub`: the release key, pinned here. The signature of a release's checksums is checked against it.
-
-Adding a release's runtime is `scripts/update-runtime.sh <version>`. It fetches the release's signed `SHA256SUMS`, checks the
-signature and the archives' hashes, and records the entry in `nix/runtime.json`. Re-running it for a recorded version changes
-nothing.
-
-The compile checks that the source's engine (`scripts/runtime-stamp.sh`) is the runtime's. A source that changes webkit, bun,
-or their patches fails with the stamp it needs, and that runtime must be recorded first.
-
-A source build does not rebuild the runtime, which takes about an hour and 40 GB, so it is fetched.
-
-## Plugins
-
-`buildPiBoltPlugin` takes a plugin's source and entry file, and lists its npm `libraries`, the other plugins it imports as
-`dependencies`, and any `runtimeInputs`. Its output is the plugin's tree, which `pi-bolt.withPlugins` compiles in, or
-`-e ${plugin.extensionPath}` loads at run time. Pi-Bolt's own docs (`docs/PLUGINS.md`) describe the contract.
+- [Plugins](docs/PLUGINS.md): building, patching, and compiling in or loading plugins
+- [Releases and runtimes](docs/RELEASES.md): which release is built, building from another source, and adding a release
 
 ## Checks
 
-```
+```sh
 nix flake check
 ```
 
-Linux only (x86_64 and aarch64), as Pi-Bolt's compile is.
+CI runs it on x86_64 and aarch64.

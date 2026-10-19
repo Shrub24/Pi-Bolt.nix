@@ -75,6 +75,13 @@ let
 in
 # Two plugins of one name are refused when the executable's derivation is evaluated.
 assert !(builtins.tryEval conflicting.unwrapped.drvPath).success;
+# A plugin given no version still has a name (its default is "0").
+assert
+  (buildPiBoltPlugin {
+    pname = "pi-bolt-check-versionless";
+    src = ./helper;
+    entry = "index.ts";
+  }).name == "pi-bolt-check-versionless-0";
 assert lib.elem tool built.unwrapped.runtimeInputs;
 assert lib.elem tool built.runtimeInputs;
 assert lib.hasSuffix "-jit"

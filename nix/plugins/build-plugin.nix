@@ -72,6 +72,7 @@ lib.extendMkDerivation {
           or (throw "buildPiBoltPlugin ${finalAttrs.pname}: dependency ${dep.name or "?"} is not a Pi-Bolt plugin");
     in
     {
+      inherit version;
       dontConfigure = args.dontConfigure or true;
       dontBuild = args.dontBuild or true;
       # (A plugin is source: its TypeScript is the deliverable, so there is nothing to strip or patch.)
