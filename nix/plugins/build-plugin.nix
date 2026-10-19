@@ -24,7 +24,7 @@ lib.extendMkDerivation {
 
   extendDrvArgs =
     finalAttrs:
-    {
+    args@{
       # A plugin's version lives in its own package.json, so this only names the derivation.
       version ? "0",
       # The file, relative to the plugin's root, whose default export is the extension factory.
@@ -67,16 +67,17 @@ lib.extendMkDerivation {
     in
     {
       inherit version;
-      dontConfigure = true;
-      dontBuild = true;
+      # Defaults a caller can override: stdenv runs make when the plugin's source has a Makefile.
+      dontConfigure = args.dontConfigure or true;
+      dontBuild = args.dontBuild or true;
       # A plugin is source: its TypeScript is the deliverable, so there is nothing to strip or patch.
-      dontFixup = true;
-      nativeBuildInputs = lib.optional (packageName != null) nodejs;
+      dontFixup = args.dontFixup or true;
+      nativeBuildInputs = (args.nativeBuildInputs or [ ]) ++ lib.optional (packageName != null) nodejs;
 
       installPhase = ''
         runHook preInstall
         ${lib.optionalString (packageName != null) ''
-          # Other plugins import this one by packageName, so a mismatch would link the wrong module.
+          # The declared packageName must be the plugin's package.json name.
           if [ -f package.json ]; then
             actual=$(node -p 'require("./package.json").name')
             if [ "$actual" != ${lib.escapeShellArg packageName} ]; then
@@ -102,7 +103,7 @@ lib.extendMkDerivation {
         runHook postInstall
       '';
 
-      passthru = {
+      passthru = (args.passthru or { }) // {
         # What pi-bolt's build reads (nix/pi-bolt.nix).
         piBolt = {
           name = pluginName;

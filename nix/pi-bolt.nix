@@ -4,14 +4,13 @@
 #   pi-bolt.withPlugins (ps: [ ps.word-count ]) with plugins compiled in (from piBoltPlugins, or built anywhere)
 #   pi-bolt.override { jit = true; }            the JIT build
 #
-# scripts/build-pi.sh builds the executable from the workspace (nix/workspace.nix) and the runtime nix/runtime.json names.
+# scripts/build-pi.sh builds the executable from the workspace (nix/workspace.nix) and the runtime nix/runtime.nix names.
 # This package copies it and adds a PATH launcher, so a launcher change does not recompile, and both sit in one store path:
 # Pi-Bolt finds its assets beside process.execPath.
 args@{
   lib,
   stdenv,
   stdenvNoCC,
-  fetchurl,
   callPackage,
   python3,
   rsync,
@@ -21,7 +20,9 @@ args@{
   libxcb,
   ripgrep,
   fd,
-  # The release whose version selects the runtime (nix/runtime.json) and whose tag names it.
+  # The runtime the release needs (nix/runtime.nix). Its version must be the release's.
+  pi-bolt-runtime,
+  # The release whose tag names the runtime's release.
   release,
   # What gets compiled. By default the release's source; override it to build another source with the same engine.
   source,
@@ -48,16 +49,12 @@ stdenvNoCC.mkDerivation (
   finalAttrs:
   let
     releaseVersion = lib.removeSuffix "\n" (builtins.readFile "${release.outPath}/VERSION");
-    runtimes = lib.importJSON ./runtime.json;
-    runtimePin =
-      runtimes.${releaseVersion}
-        or (throw "pi-bolt: no runtime recorded for release ${releaseVersion}: add it to nix/runtime.json");
-    system = stdenv.hostPlatform.system;
-    pin = runtimePin.platforms.${system} or (throw "pi-bolt: no Nix build for ${system} yet");
-    runtime = fetchurl {
-      url = "https://github.com/opensec-git/Pi-Bolt/releases/download/bolt-v${releaseVersion}/${pin.name}";
-      inherit (pin) sha256;
-    };
+    runtime =
+      if pi-bolt-runtime.version == releaseVersion then
+        pi-bolt-runtime
+      else
+        throw "pi-bolt: the runtime is ${pi-bolt-runtime.version}, the release is ${releaseVersion}: run nix run .#update-runtime -- ${releaseVersion}";
+    runtimeStamp = runtime.passthru.stamp;
 
     sources = callPackage ./source.nix { inherit source; };
 
@@ -170,6 +167,8 @@ stdenvNoCC.mkDerivation (
     unwrapped = stdenv.mkDerivation {
       pname = "pi-bolt-unwrapped";
       inherit version;
+      # Without a source, stdenv's default is 1980-01-01, which the executable's build stamp would then print.
+      SOURCE_DATE_EPOCH = toString source.lastModified;
 
       dontUnpack = true;
       nativeBuildInputs = [
@@ -191,8 +190,8 @@ stdenvNoCC.mkDerivation (
         # The runtime is an engine: a source that changes it (webkit, bun, their patches) needs a runtime of its own. Checked on
         # the store copy, since patchShebangs rewrites the scripts the stamp hashes.
         stamp=$(bash ${sources.compile}/scripts/runtime-stamp.sh)
-        [ "$stamp" = ${runtimePin.stamp} ] || {
-          echo "pi-bolt: this source's engine is not release ${releaseVersion}'s (source stamp $stamp, runtime stamp ${runtimePin.stamp}): add its runtime to nix/runtime.json" >&2
+        [ "$stamp" = ${runtimeStamp} ] || {
+          echo "pi-bolt: this source's engine is not release ${releaseVersion}'s (source stamp $stamp, runtime stamp ${runtimeStamp}); a runtime built from that engine is needed, or checkRuntimeStamp = false" >&2
           ${if checkRuntimeStamp then "exit 1" else ":"}
         }
         # The scripts start with /usr/bin/env, which the build sandbox does not have.
@@ -221,7 +220,7 @@ stdenvNoCC.mkDerivation (
         # --cpu baseline: code tuned for the builder's CPU could not be shared or substituted.
         PIBOLT_WORK=$TMPDIR/work \
           PIBOLT_BUN=$PWD/runtime/bun \
-          PIBOLT_RUNTIME_STAMP=${runtimePin.stamp} \
+          PIBOLT_RUNTIME_STAMP=${runtimeStamp} \
           ./tree/scripts/build-pi.sh --cpu baseline --jit ${if jit then "on" else "off"} \
           ${
             lib.optionalString (
@@ -259,10 +258,10 @@ stdenvNoCC.mkDerivation (
     meta = {
       description = "Pi, the coding agent, compiled ahead of time";
       homepage = "https://github.com/opensec-git/Pi-Bolt";
-      # Pi-Bolt and Bun are MIT; the bundled WebKit is LGPL-2.0 and BSD-2-Clause per file (THIRD_PARTY_NOTICES.md).
+      # Pi-Bolt and Bun are MIT; the bundled WebKit is LGPL-2.0-or-later and BSD-2-Clause per file (THIRD_PARTY_NOTICES.md).
       license = [
         lib.licenses.mit
-        lib.licenses.lgpl2Only
+        lib.licenses.lgpl2Plus
         lib.licenses.bsd2
       ];
       platforms = [

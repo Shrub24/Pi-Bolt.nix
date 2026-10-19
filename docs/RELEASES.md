@@ -18,8 +18,8 @@ The first two are the same for every variant of a release, which is what makes t
 
 ## Which release is built
 
-The `pi-bolt` input is a Pi-Bolt release tag, such as `bolt-v0.9.5`. Its `VERSION` names the version, and `nix/runtime.json`
-gives the runtime for that version. `pi-bolt-source` is what gets compiled. It follows `pi-bolt` by default, so the default
+The `pi-bolt` input is a Pi-Bolt release tag, such as `bolt-v0.9.5`. Its `VERSION` names the version, and `nix/runtime.nix`
+is the runtime for that version; the build fails if the two differ. `pi-bolt-source` is what gets compiled. It follows `pi-bolt` by default, so the default
 build is the release.
 
 ## Building from another source
@@ -62,23 +62,28 @@ pkgs.pi-bolt.override { checkRuntimeStamp = false; }
 
 ## Adding a release
 
-1. Record the release's runtime:
+1. Move the runtime to the release:
 
    ```sh
    nix run .#update-runtime -- 0.9.6     (from the repository root)
    ```
 
-   The script downloads the release's `SHA256SUMS`, its signature, `RUNTIME_STAMP` and the runtime archives. It checks the
-   signature against `keys/release.pub`, then each archive's hash against the signed sums, and writes the entry to
-   `nix/runtime.json`. Running it again for a recorded version changes nothing. A version recorded with different values is
-   refused.
+   The script checks the release's `SHA256SUMS` against `keys/release.pub`, then runs `nix-update` on
+   `packages.<system>.pi-bolt-runtime` for this system: it sets the version and downloads this system's archive for its hash.
+   The other system's hash and the engine stamp come from the signed sums and `RUNTIME_STAMP`. Finally it evaluates every
+   system's runtime and checks its version, stamp and hash against the signed sums. Nothing is built. Running it again for the
+   same version changes nothing.
+
+   `nix-update` alone can run the same version step (`nix-update --flake --system <system> --version <v>
+   packages.<system>.pi-bolt-runtime`), but it leaves the other system's hash and the stamp stale. The check in step 3 fails
+   until the script has run.
 
 2. Point the `pi-bolt` input at the tag in `flake.nix`, then run `nix flake lock`.
 
 3. Run `nix flake check`.
 
-A release's entry stays after the next release, so a downstream flake pinning that release's input still resolves. Delete old
-entries when the list gets long.
+`nix/runtime.nix` holds one release. A downstream flake pinned to an older `pi-bolt-nix` revision gets that revision's runtime
+from the lock, so older releases stay resolvable without a table of them.
 
 `keys/release.pub` is this repository's copy of the release key. The script trusts that copy, not a key shipped with the release.
 Replace the file only when the Pi-Bolt project rotates its key, and check the new key against a release it signed before
