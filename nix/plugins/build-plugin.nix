@@ -6,7 +6,6 @@
 {
   lib,
   stdenvNoCC,
-  nodejs,
 }:
 lib.extendMkDerivation {
   constructDrv = stdenvNoCC.mkDerivation;
@@ -72,20 +71,10 @@ lib.extendMkDerivation {
       dontBuild = args.dontBuild or true;
       # A plugin is source: its TypeScript is the deliverable, so there is nothing to strip or patch.
       dontFixup = args.dontFixup or true;
-      nativeBuildInputs = (args.nativeBuildInputs or [ ]) ++ lib.optional (packageName != null) nodejs;
+      nativeBuildInputs = args.nativeBuildInputs or [ ];
 
       installPhase = ''
         runHook preInstall
-        ${lib.optionalString (packageName != null) ''
-          # The declared packageName must be the plugin's package.json name.
-          if [ -f package.json ]; then
-            actual=$(node -p 'require("./package.json").name')
-            if [ "$actual" != ${lib.escapeShellArg packageName} ]; then
-              echo "buildPiBoltPlugin ${finalAttrs.pname}: packageName is ${packageName} but its package.json names $actual" >&2
-              exit 1
-            fi
-          fi
-        ''}
         mkdir -p $out
         cp -r . $out/
         chmod -R u+w $out

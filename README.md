@@ -22,7 +22,8 @@ which provides `pkgs.pi-bolt`:
   inputs.pi-bolt-nix.inputs.nixpkgs.follows = "nixpkgs";
 
   outputs = { nixpkgs, home-manager, pi-bolt-nix, ... }: let
-    pkgs = nixpkgs.legacyPackages.x86_64-linux.extend pi-bolt-nix.overlays.default;
+    system = "x86_64-linux";
+    pkgs = import nixpkgs { inherit system; overlays = [ pi-bolt-nix.overlays.default ]; };
   in {
     homeConfigurations.me = home-manager.lib.homeManagerConfiguration {
       inherit pkgs;
@@ -58,9 +59,11 @@ flake's, so a cache of its builds cannot serve them.
 | --- | --- |
 | `packages.<system>.pi-bolt` | Pi-Bolt, baseline CPU |
 | `packages.<system>.pi-bolt-jit` | Pi-Bolt with the JIT |
+| `packages.<system>.pi-bolt-runtime` | The engine the executable runs on, unpacked for this system |
 
-The overlay also provides `pkgs.pi-bolt.withPlugins`, `pkgs.piBoltPlugins`, `pkgs.pi-bolt.unwrapped` (the executable, without
-its launcher) and `pkgs.pi-bolt.mkLauncher` (a launcher with its own environment and `PATH`; see [Plugins](docs/PLUGINS.md#launchers)).
+The overlay also provides `pkgs.pi-bolt.withPlugins`, `pkgs.piBoltPlugins`, and `pkgs.pi-bolt.unwrapped` (the executable,
+without any launcher). `pkgs.pi-bolt` takes `launchers` for entrypoints with their own environment and `PATH`
+([Plugins](docs/PLUGINS.md#launchers)), `plugins` to compile plugins in, and `jit`.
 
 ## Documentation
 

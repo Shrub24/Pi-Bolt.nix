@@ -30,6 +30,10 @@ args@{
 
   # Plugins to compile in: buildPiBoltPlugin derivations. Each is a built-in extension, builtin:<name>.
   plugins ? [ ],
+  # Launchers to install beside the executable: name → { env, path }. Each gets a `bin/<name>`, and the `pi` it runs is this
+  # package's, so there is one copy of lib/pi-bolt and `pi-bolt doctor` counts each launcher as this installation. `pi-bolt` is
+  # always present and can be overridden by name. `path` adds to the package's tools.
+  launchers ? { },
   # The JIT build: compiled code as always, and run-time loaded extensions JIT-compiled too.
   jit ? false,
   # The largest module (top-level bytecode, in bytes) the AOT compiler takes. The compiler names the module it refused; raise
@@ -253,7 +257,15 @@ stdenvNoCC.mkDerivation (
     );
 
     mkLauncher = callPackage ./launcher.nix { };
-    defaultLauncher = mkLauncher { path = toolInputs; };
+    installedLaunchers = lib.mapAttrsToList (name: spec: {
+      inherit name;
+      launcher = mkLauncher {
+        inherit name;
+        env = spec.env or { };
+        # `path` adds to the package's tools: adding a program to one launcher must not drop rg and fd from it.
+        path = toolInputs ++ (spec.path or [ ]);
+      };
+    }) ({ pi-bolt = { }; } // launchers);
 
     meta = {
       description = "Pi, the coding agent, compiled ahead of time";
@@ -287,10 +299,12 @@ stdenvNoCC.mkDerivation (
       mkdir -p $out/lib $out/bin
       cp -r ${unwrapped}/lib/pi-bolt $out/lib/pi-bolt
       chmod -R u+w $out/lib/pi-bolt
-      # Beside the executable, not in bin/: `pi-bolt doctor` calls this installation its own only when the launcher on PATH
-      # resolves to the executable's folder. The launcher sets PATH and passes argv through unchanged.
-      install -m 755 ${defaultLauncher} $out/lib/pi-bolt/pi-bolt
-      ln -s ../lib/pi-bolt/pi-bolt $out/bin/pi-bolt
+      # Beside the executable, not in bin/: `pi-bolt doctor` calls a launcher this installation's own only when it resolves to
+      # the executable's folder. Each sets PATH and passes argv through unchanged.
+      ${lib.concatMapStrings ({ name, launcher }: ''
+        install -m 755 ${launcher} $out/lib/pi-bolt/${lib.escapeShellArg name}
+        ln -s ../lib/pi-bolt/${lib.escapeShellArg name} $out/bin/${lib.escapeShellArg name}
+      '') installedLaunchers}
       ln -s ../lib/pi-bolt/pi-bolt $out/bin/pi
       runHook postInstall
     '';
@@ -324,8 +338,6 @@ stdenvNoCC.mkDerivation (
       inherit unwrapped;
       plugins = finalAttrs.plugins;
       runtimeInputs = toolInputs;
-      # The launcher generator the package's own launcher is built with: consumers' launchers are calls to it.
-      inherit mkLauncher;
       # Through callPackage again, so that the result carries `override` too: `(pi-bolt.withPlugins f).override { jit = true; }`.
       withPlugins = select: callPackage ./pi-bolt.nix (args // { plugins = select piBoltPlugins; });
     };

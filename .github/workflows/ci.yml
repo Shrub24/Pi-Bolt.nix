@@ -18,10 +18,11 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
-      - uses: cachix/install-nix-action@v31
+      # Pinned to the commit, not the tag: a tag can move.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31
       - run: nix fmt -- --ci
-      # Evaluation only: building every output belongs to the cache job, when there is one. The plugin contract is built here
-      # because it is the only check of the compiled-in plugin path.
+      # Every output is evaluated, and the checks are built: they are the only tests of the compiled-in plugin path and of the
+      # launchers. The packages are not built here; a cache job does that later.
       - run: nix flake check --no-build --all-systems
-      - run: nix build ".#checks.$(nix eval --impure --raw --expr builtins.currentSystem).plugins" --print-build-logs
+      - run: nix build ".#checks.$(nix eval --impure --raw --expr builtins.currentSystem)."{plugins,launcher,plugin-builder,jit,pi-bolt-example} --print-build-logs

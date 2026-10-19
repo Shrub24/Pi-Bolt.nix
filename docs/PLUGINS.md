@@ -125,36 +125,49 @@ inside a new store path, so the command you run is not the package's.
 
 ## Launchers
 
-`pkgs.pi-bolt.mkLauncher` writes one launcher script. It sets the environment and `PATH` it is given, then runs the `pi` beside
-it. It takes no flags, because a flag before the user's arguments changes which subcommand Pi takes; flags belong to the caller.
+A launcher is a script that sets the environment and `PATH` it is given, then runs the `pi` beside it in `lib/pi-bolt`. One
+package carries as many as you have entrypoints: each is a config root and a tool set over the same compiled payload, so a
+second role costs a script, not a second copy of Pi.
+
+`launchers` installs them; `bin/<name>` links to each:
 
 ```nix
-pkgs.pi-bolt.mkLauncher {
-  name = "pi-bolt-lead";                      # default: pi-bolt
-  env.PI_CODING_AGENT_DIR = "/path/to/role";  # the role's config directory
-  path = [ pkgs.fd pkgs.ripgrep ];            # prepended to PATH
+pkgs.pi-bolt.override {
+  launchers = {
+    # The default: `pi-bolt` is always installed and can be overridden by name.
+    pi-bolt = { };
+
+    pi-bolt-child = {
+      env.PI_CODING_AGENT_DIR = "/home/me/.pi/roles/child";  # this role's agent directory
+      path = [ pkgs.git ];                                   # added to the package's tools
+    };
+  };
 }
 ```
 
-The script finds `pi` relative to itself, so it works in any copy of `lib/pi-bolt`. To install one, copy the package's
-`lib/pi-bolt` into your output, place the launcher beside `pi`, and link `bin/` to it:
+- `env` values are quoted literally, so a path there must be absolute (`$HOME` would not expand).
+- `path` is *added* to the launcher's `PATH`; the package's `runtimeInputs` and its plugins' tools are always there.
+- A launcher takes no flags. A flag before the user's arguments changes which subcommand Pi takes, so what a role needs goes in
+  its `settings.json` (in its agent directory), in `env`, or in `path`.
+- What a launcher changes is the launch configuration only. A different compiled plugin set is a different package, not another
+  launcher.
+
+### Publishing the launchers from your own output
+
+If your configuration builds its own installation tree, take the package's launchers rather than writing scripts: both the
+launcher and the executable then resolve into the package, which is what `pi-bolt doctor` reads.
 
 ```nix
-let
-  lead = pkgs.pi-bolt.mkLauncher { name = "pi-bolt-lead"; env.PI_CODING_AGENT_DIR = "/path/to/role"; };
-in
-pkgs.runCommand "pi-bolt-roles" { } ''
-  mkdir -p $out/lib $out/bin
-  cp -r ${pkgs.pi-bolt.unwrapped}/lib/pi-bolt $out/lib/pi-bolt
-  chmod -R u+w $out/lib/pi-bolt
-  install -m 755 ${lead} $out/lib/pi-bolt/pi-bolt-lead
-  ln -s ../lib/pi-bolt/pi-bolt-lead $out/bin/pi-bolt-lead
+pkgs.runCommand "pi-bolt-entrypoints" { } ''
+  mkdir -p $out/bin
+  for f in ${launchers}/bin/*; do
+    ln -s "$f" $out/bin/$(basename "$f")
+  done
 ''
 ```
 
-`pi-bolt doctor` counts a launcher as this installation only when it is in the executable's folder, which is why the placement
-matters. A launcher in your own `bin/` is reported as `not this Pi-Bolt`, which costs nothing but the label. The flake's
-`launcher` check runs the generated script with a stub `pi`, moved to another directory.
+`readlink -f` on such a symlink lands in the package's `lib/pi-bolt`, beside the executable, so `doctor` reports it as this
+installation. A copy of `lib/pi-bolt` works too, as long as the launcher ends up in the same folder as `pi`.
 
 ## Known limitations
 
