@@ -1,0 +1,8 @@
+{
+  "name": "@pi-bolt-check/settings-runtime",
+  "version": "0.0.0",
+  "private": true,
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}

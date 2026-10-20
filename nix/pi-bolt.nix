@@ -248,9 +248,15 @@ stdenvNoCC.mkDerivation (
       };
     };
 
-    toolInputs = lib.unique (
-      runtimeInputs ++ lib.concatMap (plugin: plugin.piBolt.runtimeInputs) finalAttrs.plugins
-    );
+    # The tools a selection of plugins needs, beside the package's own. A run-time plugin's tools come through here too.
+    runtimeInputsFor =
+      plugins: lib.unique (runtimeInputs ++ lib.concatMap (plugin: plugin.piBolt.runtimeInputs) plugins);
+    toolInputs = runtimeInputsFor finalAttrs.plugins;
+
+    settings = callPackage ./settings.nix { };
+    # The settings for a selection of plugins, defaulting to the compiled set. Plugins the payload does not compile are passed in.
+    mkSettings = args: settings.render ({ compiled = finalAttrs.plugins; } // args);
+    mkSettingsFile = args: writeText "settings.json" (builtins.toJSON (mkSettings args));
 
     mkLauncher = callPackage ./launcher.nix { };
     installedLaunchers = lib.mapAttrsToList (name: spec: {
@@ -328,7 +334,12 @@ stdenvNoCC.mkDerivation (
     '';
 
     passthru = {
-      inherit unwrapped;
+      inherit
+        unwrapped
+        mkSettings
+        mkSettingsFile
+        runtimeInputsFor
+        ;
       plugins = finalAttrs.plugins;
       runtimeInputs = toolInputs;
       # Through callPackage again, so that the result carries `override` too: `(pi-bolt.withPlugins f).override { jit = true; }`.

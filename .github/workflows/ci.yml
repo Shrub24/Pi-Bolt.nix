@@ -25,4 +25,10 @@ jobs:
       # Every output is evaluated, and the checks are built: they are the only tests of the compiled-in plugin path and of the
       # launchers. The packages are not built here; a cache job does that later.
       - run: nix flake check --no-build --all-systems
-      - run: nix build ".#checks.$(nix eval --impure --raw --expr builtins.currentSystem)."{plugins,launcher,plugin-builder,jit,pi-bolt-example} --print-build-logs
+      # Every check the flake declares for this system is built, so a new check cannot be left out.
+      - run: |
+          system=$(nix eval --impure --raw --expr builtins.currentSystem)
+          checks=$(nix eval --raw ".#checks.$system" --apply 'cs: builtins.concatStringsSep " " (builtins.attrNames cs)')
+          for check in $checks; do
+            nix build ".#checks.$system.$check" --print-build-logs
+          done

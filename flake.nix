@@ -58,6 +58,8 @@
         launcher = pkgs.callPackage ./nix/tests/launcher.nix { };
         # The plugin builder keeps the caller's passthru, build flags and nativeBuildInputs.
         plugin-builder = pkgs.callPackage ./nix/tests/plugin-builder.nix { };
+        # The settings renderer: which plugins load, from where, and what Pi answers with them.
+        settings = pkgs.callPackage ./nix/tests/settings.nix { };
         # The JIT build, which no package output builds on its own.
         jit = pkgs.pi-bolt.override { jit = true; };
         # The word-count example from Pi-Bolt's examples/plugins, compiled in.

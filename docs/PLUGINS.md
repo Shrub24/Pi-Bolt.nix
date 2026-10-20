@@ -84,6 +84,70 @@ package = pkgs.pi-bolt.withPlugins (ps: [
 `withPlugins` takes a function from the plugin set to a list of plugins. The plugins can come from `piBoltPlugins` or be
 built anywhere. Two different plugins with the same `pluginName` fail the build.
 
+## Settings for a selection
+
+The package renders the `settings.json` keys for its plugins, so the list is written once. `mkSettings` returns the keys as a
+value; `mkSettingsFile` writes them to a store file.
+
+```nix
+let
+  payload = pkgs.pi-bolt.withPlugins (ps: [ ps.word-count ]);
+in
+{
+  # The compiled plugins and their resources.
+  settings = payload.mkSettings { };
+  # A subset of the compiled plugins, with a run-time plugin added. The run-time plugin must be passed in.
+  roleSettings = payload.mkSettings { plugins = [ runtimePlugin ]; };
+  # The tools that selection needs, for a launcher's `path`.
+  roleTools = payload.runtimeInputsFor [ runtimePlugin ];
+}
+```
+
+- A compiled plugin's entry carries only its resources (`extensions = [ ]`); its extension is the built-in one.
+- A plugin the payload does not compile is an ordinary package entry, and Pi loads it from the store.
+- A compiled plugin left out of `plugins` gets no entry, so its skills and prompts stop loading too.
+- `closed = true` admits only the selected compiled plugins and the built-ins named in `enable`. Run-time plugins under
+  `closed` are not verified.
+- The renderer refuses two different plugins of one name, a name that is one of Pi's built-ins, a `builtin = false` plugin that
+  the selection leaves out, and an `enable` name that is no built-in.
+
+What the renderer does not do:
+
+- It does not place the file. Pi writes `settings.json` in place, and a store file is read-only. Copy the file into the agent
+  directory at activation; never link it.
+- It does not emit resources for a package that has no extension. Add such a package yourself, as `{ source = pkg; }` in the
+  `packages` list.
+- Its output is a value, so compose it with `lib.recursiveUpdate` or a module. Module merging appends lists and
+  `recursiveUpdate` replaces them.
+
+Precedence, when a shared settings file also holds patterns: `-` beats `+`, `+` beats `!`, and `!` beats a plain include.
+A `+builtin:<name>` written by hand cannot re-enable a built-in the renderer switched off with `-builtin:<name>`.
+
+### Footguns
+
+- A plugin that is also listed as an npm package loads at run time, and its copy replaces the compiled one. Keep it out of
+  `packages`, or filter its extension off. `pi-bolt doctor` shows what loaded.
+- Pattern syntax (`+`, `-`, `!`) is Pi's, so stock Pi reads it in a shared settings file. Whether a given stock version does is
+  not verified here, and a shared directory is not supported. A broad pattern such as `!extensions/**` can switch off stock Pi's
+  own extensions. Use `closed` only in a directory that only Pi-Bolt reads.
+- `pi install` and `pi config` write `settings.json`, which fails when it is a store file. Declare plugins in Nix.
+- Nothing checks that skill and command names are unique across the selected packages. Pi reports collisions when it loads them.
+
+### Moving a shared directory onto the overlay
+
+The renderer emits `packages` for the selection. A directory that stock Pi also reads should keep its packages in the
+`piBolt.packages` overlay, so stock Pi does not see entries whose extensions are filtered off:
+
+```nix
+packages = [ ];
+piBolt = {
+  packagesOverlay = true;
+  packages = (payload.mkSettings { }).packages;
+};
+```
+
+Roles that only Pi-Bolt reads take `packages` directly.
+
 ## Large modules
 
 The AOT compiler compiles a module only if its top-level bytecode is at most 256 KB (`BUN_JSC_maximumAOTCandidateBytecodeSize`,

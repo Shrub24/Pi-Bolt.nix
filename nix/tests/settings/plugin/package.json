@@ -1,0 +1,10 @@
+{
+  "name": "@pi-bolt-check/settings-plugin",
+  "version": "0.0.0",
+  "private": true,
+  "pi": {
+    "extensions": ["./index.ts"],
+    "skills": ["./skills"],
+    "prompts": ["./prompts"]
+  }
+}
