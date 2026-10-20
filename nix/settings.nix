@@ -3,10 +3,12 @@
 # A compiled plugin is a built-in extension, builtin:<name>. Its package entry carries only its resources (skills, prompts,
 # themes): `extensions = [ ]` switches off the extension the package would load, so the compiled copy answers for it. A plugin
 # the payload does not compile is an ordinary package entry, and Pi loads it from the store. A plugin left out of the
-# selection has no entry, so its resources are not loaded either.
+# selection has no entry, so its resources are not loaded either. Any other entry (an npm or git source, a filtered object)
+# is passed through unchanged.
 { lib }:
 let
-  # Pi's own built-in extensions (packages/coding-agent/src/extensions/index.ts). herdr is on only inside a Herdr pane.
+  # Pi's built-in extension names (packages/coding-agent/src/extensions/index.ts). herdr is on only inside a Herdr pane.
+  # nix/tests/settings.nix checks this list against that file.
   piBuiltins = [
     "llama.cpp"
     "codemode"
@@ -15,6 +17,7 @@ let
     "herdr"
   ];
 
+  isPlugin = entry: builtins.isAttrs entry && entry ? piBolt;
   same = a: b: toString a == toString b;
   contains = list: plugin: lib.any (same plugin) list;
   unique = lib.foldl' (acc: plugin: if contains acc plugin then acc else acc ++ [ plugin ]) [ ];
@@ -48,15 +51,19 @@ let
       true;
 in
 {
+  inherit piBuiltins;
+
   render =
     {
       compiled,
       plugins ? compiled,
       closed ? false,
       enable ? [ ],
+      extensions ? [ ],
     }:
     let
-      selected = unique plugins;
+      selected = unique (lib.filter isPlugin plugins);
+      passed = lib.filter (entry: !isPlugin entry) plugins;
       selectedBuiltins = lib.filter (plugin: contains compiled plugin && plugin.piBolt.builtin) selected;
       leftOut = lib.filter (plugin: !contains selected plugin && plugin.piBolt.builtin) compiled;
       entry =
@@ -74,8 +81,12 @@ in
       allowed = map (id: "+builtin:${id}") (
         lib.optionals closed (map (plugin: plugin.piBolt.name) selectedBuiltins) ++ enable
       );
-      extensions = denied ++ allowed;
+      # Paths the caller lists load as given: a deny pattern above does not match an explicitly listed path.
+      generated = denied ++ allowed ++ extensions;
     in
     assert validate { inherit compiled selected enable; };
-    { packages = map entry selected; } // lib.optionalAttrs (extensions != [ ]) { inherit extensions; };
+    {
+      packages = map entry selected ++ passed;
+    }
+    // lib.optionalAttrs (generated != [ ]) { extensions = generated; };
 }

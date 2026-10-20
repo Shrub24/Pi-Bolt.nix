@@ -36,7 +36,7 @@ args@{
   # The JIT build: compiled code as always, and run-time loaded extensions JIT-compiled too.
   jit ? false,
   # The largest module (top-level bytecode, in bytes) the AOT compiler takes. The compiler names the module it refused; raise
-  # this for it (docs/PLUGINS.md: Large modules).
+  # this for it (docs/PLUGINS.md, "Large modules").
   maxAotCandidateBytecodeSize ? null,
   # Fail when the source's engine stamp is not the runtime's. Set false to warn instead: the stamp also covers files that do not
   # affect this system (scripts/build-runtime.ps1), so a branch that edits only those could not be built otherwise.
@@ -250,13 +250,21 @@ stdenvNoCC.mkDerivation (
 
     # The tools a selection of plugins needs, beside the package's own. A run-time plugin's tools come through here too.
     runtimeInputsFor =
-      plugins: lib.unique (runtimeInputs ++ lib.concatMap (plugin: plugin.piBolt.runtimeInputs) plugins);
+      plugins:
+      lib.unique (
+        runtimeInputs
+        ++ lib.concatMap (plugin: plugin.piBolt.runtimeInputs) (
+          lib.filter (plugin: plugin ? piBolt) plugins
+        )
+      );
     toolInputs = runtimeInputsFor finalAttrs.plugins;
 
-    settings = callPackage ./settings.nix { };
-    # The settings for a selection of plugins, defaulting to the compiled set. Plugins the payload does not compile are passed in.
-    mkSettings = args: settings.render ({ compiled = finalAttrs.plugins; } // args);
-    mkSettingsFile = args: writeText "settings.json" (builtins.toJSON (mkSettings args));
+    # One call for one selection: the settings keys and the tools the same selection needs. Defaults to the compiled set.
+    settingsFor = callPackage ./settings.nix { };
+    select = args: {
+      settings = settingsFor.render ({ compiled = finalAttrs.plugins; } // args);
+      runtimeInputs = runtimeInputsFor (args.plugins or finalAttrs.plugins);
+    };
 
     mkLauncher = callPackage ./launcher.nix { };
     installedLaunchers = lib.mapAttrsToList (name: spec: {
@@ -336,9 +344,7 @@ stdenvNoCC.mkDerivation (
     passthru = {
       inherit
         unwrapped
-        mkSettings
-        mkSettingsFile
-        runtimeInputsFor
+        select
         ;
       plugins = finalAttrs.plugins;
       runtimeInputs = toolInputs;

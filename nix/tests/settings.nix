@@ -1,19 +1,23 @@
 # The settings renderer (nix/settings.nix): the rules it keeps, and what Pi does with the settings it renders.
 #
 # Evaluation checks the rules that are ours: a plugin loads once, a compiled plugin's extension is switched off where its
-# entry is, a left-out plugin has no entry, invalid selections are refused. The built check asks Pi which commands it has,
-# with each rendered file as the agent directory's settings: which copy answered, and whether the resources came along.
+# entry is, a left-out plugin has no entry, a raw entry and a listed path pass through, invalid selections are refused. The
+# built checks ask Pi which commands it has, with each rendered file as the agent directory's settings, and compare the
+# renderer's built-in list with Pi's source.
 {
   lib,
   runCommand,
   jq,
   writeShellScriptBin,
+  writeText,
   pi-bolt,
   piBoltPlugins,
+  source,
 }:
 let
   inherit (piBoltPlugins) buildPiBoltPlugin;
-  inherit (import ../settings.nix { inherit lib; }) render;
+  settingsFor = import ../settings.nix { inherit lib; };
+  inherit (settingsFor) render piBuiltins;
 
   tool = writeShellScriptBin "pi-bolt-check-settings-tool" "printf tool";
   plugin = buildPiBoltPlugin {
@@ -46,6 +50,10 @@ let
     entry = "index.ts";
     builtin = false;
   };
+  rawEntry = {
+    source = "${runtime}";
+    skills = [ ];
+  };
 
   sources = map (entry: entry.source);
   entryOf =
@@ -65,18 +73,35 @@ let
   };
 
   payload = pi-bolt.withPlugins (_: [ plugin ]);
-  allFile = payload.mkSettingsFile {
+  settingsFile =
+    selection: writeText "settings.json" (builtins.toJSON (payload.select selection).settings);
+  allFile = settingsFile {
     plugins = [
       plugin
       runtime
     ];
   };
-  leftOutFile = payload.mkSettingsFile { plugins = [ runtime ]; };
-  closedFile = payload.mkSettingsFile {
+  leftOutFile = settingsFile { plugins = [ runtime ]; };
+  closedFile = settingsFile {
     plugins = [ plugin ];
     closed = true;
     enable = [ "mcp" ];
   };
+  closedPathFile = settingsFile {
+    plugins = [ plugin ];
+    closed = true;
+    extensions = [ "${runtime}/index.ts" ];
+  };
+
+  chained = ((pi-bolt.override { jit = true; }).withPlugins (_: [ plugin ])).select { };
+
+  builtinIds = runCommand "pi-bolt-builtin-ids" { } ''
+    sed -n '/builtInExtensions/,/^];/p' ${source}/packages/coding-agent/src/extensions/index.ts \
+      | grep -o 'name: "[^"]*"' | cut -d'"' -f2 | sort -u > pi
+    printf '%s\n' ${lib.escapeShellArgs piBuiltins} | sort -u > ours
+    diff ours pi
+    touch $out
+  '';
 in
 # A plugin listed twice loads once.
 assert
@@ -94,8 +119,29 @@ assert !((entryOf runtime both.packages) ? extensions);
 # A plugin left out of the selection has no entry, and its compiled copy is switched off by name.
 assert sources leftOut.packages == [ "${runtime}" ];
 assert lib.elem "-builtin:settings-compiled" leftOut.extensions;
-# A run-time plugin's tools reach the launcher's PATH with the package's own.
-assert lib.elem tool (pi-bolt.runtimeInputsFor [ runtime ]);
+# A raw entry is passed through unchanged, and a listed path is appended as given.
+assert lib.elem rawEntry
+  (render {
+    compiled = [ plugin ];
+    plugins = [
+      plugin
+      rawEntry
+    ];
+  }).packages;
+assert lib.elem "/x/extra.ts"
+  (render {
+    compiled = [ plugin ];
+    extensions = [ "/x/extra.ts" ];
+  }).extensions or [ ];
+# A selection's tools reach the launcher's PATH with the package's own, and a raw entry adds none.
+assert lib.elem tool (pi-bolt.select { plugins = [ runtime ]; }).runtimeInputs;
+assert
+  (pi-bolt.select {
+    plugins = [
+      runtime
+      rawEntry
+    ];
+  }).runtimeInputs == (pi-bolt.select { plugins = [ runtime ]; }).runtimeInputs;
 # Refused: two plugins of one name, a Pi built-in's name, a compiled plugin built builtin = false and left out, and an enable
 # id that names nothing. The first assertion shows the renderer accepts a valid selection, so the refusals are its own.
 assert accepts {
@@ -125,13 +171,10 @@ assert
     enable = [ "mcpp" ];
   };
 # The settings follow the final payload's compiled set, through override and withPlugins.
-assert
-  sources (((pi-bolt.override { jit = true; }).withPlugins (_: [ plugin ])).mkSettings { }).packages
-  == [
-    "${plugin}"
-  ];
+assert sources chained.settings.packages == [ "${plugin}" ];
 runCommand "pi-bolt-settings-check" { nativeBuildInputs = [ jq ]; } ''
   export HOME=$TMPDIR PI_OFFLINE=1
+  : ${builtinIds} # the renderer's built-in list matches Pi's source
   # Pi's own answer to get_commands, for an agent directory whose settings are the file given.
   ask() {
     mkdir -p agent
@@ -171,5 +214,12 @@ runCommand "pi-bolt-settings-check" { nativeBuildInputs = [ jq ]; } ''
     and ([$c[] | select(.name == "llama")] | length == 0)
     and ([$c[] | select(.name == "settings-runtime")] | length == 0)
   ' closed.json "the closed selection did not admit exactly what it names"
+
+  # Closed, with a listed path: the path loads although its plugin is not selected.
+  ask ${closedPathFile} closed-path.json
+  check '
+    ([$c[] | select(.name == "settings-runtime") | .sourceInfo.path] == [$runtime + "/index.ts"])
+    and ([$c[] | select(.name == "settings-compiled") | .sourceInfo.path] == ["builtin:settings-compiled"])
+  ' closed-path.json "a listed path did not load under the closed selection"
   touch $out
 ''

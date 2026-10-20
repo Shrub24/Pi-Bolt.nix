@@ -7,7 +7,7 @@
 #
 # The values come from the release's signed SHA256SUMS and RUNTIME_STAMP, checked against keys/release.pub, this repository's
 # pinned copy of the release key. Nothing is built: the two platform hashes and the stamp move together, and each is compared
-# with the signed sums by evaluation afterwards. The `pi-bolt` input's tag is a separate step (docs/RELEASES.md).
+# with the signed sums by evaluation afterwards. The `pi-bolt` input's tag is a separate step (docs/MAINTAINING.md).
 set -euo pipefail
 [ -f nix/runtime-data.nix ] && [ -f keys/release.pub ] || {
 	echo "update-runtime: run it from the repository root" >&2
