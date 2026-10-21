@@ -4,19 +4,10 @@
 # themes): `extensions = [ ]` switches off the extension the package would load, so the compiled copy answers for it. A plugin
 # the payload does not compile is an ordinary package entry, and Pi loads it from the store. A plugin left out of the
 # selection has no entry, so its resources are not loaded either. Any other entry (an npm or git source, a filtered object)
-# is passed through unchanged.
+# is passed through unchanged. `enable` and `extensions` are passed through as given, as the upstream Home Manager module
+# passes `settings`: the names Pi knows are Pi's to check.
 { lib }:
 let
-  # Pi's built-in extension names (packages/coding-agent/src/extensions/index.ts). herdr is on only inside a Herdr pane.
-  # nix/tests/settings.nix checks this list against that file.
-  piBuiltins = [
-    "llama.cpp"
-    "codemode"
-    "tool-search"
-    "mcp"
-    "herdr"
-  ];
-
   isPlugin = entry: builtins.isAttrs entry && entry ? piBolt;
   same = a: b: toString a == toString b;
   contains = list: plugin: lib.any (same plugin) list;
@@ -26,33 +17,22 @@ let
     {
       compiled,
       selected,
-      enable,
     }:
     let
       names = map (plugin: plugin.piBolt.name) (unique (selected ++ compiled));
       duplicated = lib.unique (lib.filter (name: lib.count (n: n == name) names > 1) names);
-      reserved = lib.intersectLists names piBuiltins;
       inlined = lib.filter (plugin: !plugin.piBolt.builtin && !contains selected plugin) compiled;
-      known =
-        piBuiltins
-        ++ map (plugin: plugin.piBolt.name) (lib.filter (plugin: plugin.piBolt.builtin) compiled);
-      unknown = lib.subtractLists known enable;
-      list = lib.concatMapStringsSep ", " (plugin: plugin.piBolt.name);
     in
     if duplicated != [ ] then
       throw "pi-bolt: more than one plugin is named ${lib.concatStringsSep ", " duplicated}; builtin:<name> is one extension"
-    else if reserved != [ ] then
-      throw "pi-bolt: a plugin is named ${lib.concatStringsSep ", " reserved}, one of Pi's own built-in extensions"
     else if inlined != [ ] then
-      throw "pi-bolt: ${list inlined} is compiled in with builtin = false, so a selection cannot switch it off; select it"
-    else if unknown != [ ] then
-      throw "pi-bolt: enable names no built-in extension: ${lib.concatStringsSep ", " unknown}"
+      throw "pi-bolt: ${
+        lib.concatMapStringsSep ", " (plugin: plugin.piBolt.name) inlined
+      } is compiled in with builtin = false, so a selection cannot switch it off; select it"
     else
       true;
 in
 {
-  inherit piBuiltins;
-
   render =
     {
       compiled,
@@ -84,7 +64,7 @@ in
       # Paths the caller lists load as given: a deny pattern above does not match an explicitly listed path.
       generated = denied ++ allowed ++ extensions;
     in
-    assert validate { inherit compiled selected enable; };
+    assert validate { inherit compiled selected; };
     {
       packages = map entry selected ++ passed;
     }

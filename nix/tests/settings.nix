@@ -1,9 +1,9 @@
 # The settings renderer (nix/settings.nix): the rules it keeps, and what Pi does with the settings it renders.
 #
 # Evaluation checks the rules that are ours: a plugin loads once, a compiled plugin's extension is switched off where its
-# entry is, a left-out plugin has no entry, a raw entry and a listed path pass through, invalid selections are refused. The
-# built checks ask Pi which commands it has, with each rendered file as the agent directory's settings, and compare the
-# renderer's built-in list with Pi's source.
+# entry is, a left-out plugin has no entry, a raw entry and a listed path pass through, a duplicate name or an inlined plugin
+# left out is refused. The built checks ask Pi which commands it has, with each rendered file as the agent directory's
+# settings.
 {
   lib,
   runCommand,
@@ -12,12 +12,10 @@
   writeText,
   pi-bolt,
   piBoltPlugins,
-  source,
 }:
 let
   inherit (piBoltPlugins) buildPiBoltPlugin;
-  settingsFor = import ../settings.nix { inherit lib; };
-  inherit (settingsFor) render piBuiltins;
+  inherit (import ../settings.nix { inherit lib; }) render;
 
   tool = writeShellScriptBin "pi-bolt-check-settings-tool" "printf tool";
   plugin = buildPiBoltPlugin {
@@ -37,12 +35,6 @@ let
     src = ./settings/runtime;
     entry = "index.ts";
     pluginName = "settings-compiled";
-  };
-  reserved = buildPiBoltPlugin {
-    pname = "settings-reserved";
-    src = ./settings/runtime;
-    entry = "index.ts";
-    pluginName = "mcp";
   };
   inlined = buildPiBoltPlugin {
     pname = "settings-inlined";
@@ -94,14 +86,6 @@ let
   };
 
   chained = ((pi-bolt.override { jit = true; }).withPlugins (_: [ plugin ])).select { };
-
-  builtinIds = runCommand "pi-bolt-builtin-ids" { } ''
-    sed -n '/builtInExtensions/,/^];/p' ${source}/packages/coding-agent/src/extensions/index.ts \
-      | grep -o 'name: "[^"]*"' | cut -d'"' -f2 | sort -u > pi
-    printf '%s\n' ${lib.escapeShellArgs piBuiltins} | sort -u > ours
-    diff ours pi
-    touch $out
-  '';
 in
 # A plugin listed twice loads once.
 assert
@@ -142,8 +126,8 @@ assert
       rawEntry
     ];
   }).runtimeInputs == (pi-bolt.select { plugins = [ runtime ]; }).runtimeInputs;
-# Refused: two plugins of one name, a Pi built-in's name, a compiled plugin built builtin = false and left out, and an enable
-# id that names nothing. The first assertion shows the renderer accepts a valid selection, so the refusals are its own.
+# Refused: two plugins of one name, and a builtin = false plugin that the selection leaves out. The positive control shows the
+# renderer accepts a valid selection, so the refusals are its own.
 assert accepts {
   compiled = [ plugin ];
   plugins = [
@@ -159,22 +143,15 @@ assert
       impostor
     ];
   };
-assert !accepts { compiled = [ reserved ]; };
 assert
   !accepts {
     compiled = [ inlined ];
     plugins = [ ];
   };
-assert
-  !accepts {
-    compiled = [ plugin ];
-    enable = [ "mcpp" ];
-  };
 # The settings follow the final payload's compiled set, through override and withPlugins.
 assert sources chained.settings.packages == [ "${plugin}" ];
 runCommand "pi-bolt-settings-check" { nativeBuildInputs = [ jq ]; } ''
   export HOME=$TMPDIR PI_OFFLINE=1
-  : ${builtinIds} # the renderer's built-in list matches Pi's source
   # Pi's own answer to get_commands, for an agent directory whose settings are the file given.
   ask() {
     mkdir -p agent

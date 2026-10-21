@@ -120,9 +120,9 @@ value combines with `lib.recursiveUpdate` (which replaces lists) or a module (wh
 - `extensions` lists paths to load as given. A deny pattern does not block them, including under `closed`.
 - `closed = true` admits only the selected compiled plugins and the built-ins named in `enable`. Package entries under `closed`
   are not tested.
-- The renderer refuses two different plugins with one name, a name that is one of Pi's built-ins, a `builtin = false` plugin
-  that the selection leaves out, and an `enable` name that is not one of Pi's built-ins. The built-in list is checked against
-  Pi's source at build time. `herdr` is one of them, but it loads only inside a Herdr pane, so enabling it elsewhere has no effect.
+- The renderer refuses two different plugins with one name, and a `builtin = false` plugin that the selection leaves out.
+- `enable` and `extensions` pass through as given. A name Pi does not know is not refused, so check the result with
+  `pi-bolt doctor`.
 
 ### Footguns
 
