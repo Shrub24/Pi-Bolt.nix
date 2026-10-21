@@ -4,6 +4,8 @@
   writeShellApplication,
   coreutils,
   findutils,
+  gnutar,
+  gzip,
   jq,
   nodejs,
   source,
@@ -13,6 +15,8 @@ writeShellApplication {
   runtimeInputs = [
     coreutils
     findutils
+    gnutar
+    gzip
     jq
     nodejs
   ];

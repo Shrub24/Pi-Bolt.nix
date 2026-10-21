@@ -53,22 +53,43 @@ let
     src = ./lockdep;
     entry = "index.ts";
   };
-  # Pi's lock with date-fns@2.30.0 added: what update-plugin-lock writes for lockdep. (@babel/runtime, which it needs, is Pi's.)
+  # What update-plugin-lock writes for lockdep, made from the release's lock so that it never goes stale: the plugin as a
+  # workspace, date-fns at the root (Pi has none), and yaml 1.10.2 under the plugin's own folder (Pi has another version).
   releaseLock = builtins.fromJSON (builtins.readFile "${source}/package-lock.json");
+  member = "pi-bolt-check-lockdep";
   pluginLock = lib.recursiveUpdate releaseLock {
     packages = {
-      "".dependencies.date-fns = "2.30.0";
+      "pbplugins/${member}" = {
+        version = "0.0.0";
+        dependencies = {
+          date-fns = "2.30.0";
+          yaml = "1.10.2";
+        };
+      };
+      "node_modules/${member}" = {
+        resolved = "pbplugins/${member}";
+        link = true;
+      };
       "node_modules/date-fns" = {
         version = "2.30.0";
         resolved = "https://registry.npmjs.org/date-fns/-/date-fns-2.30.0.tgz";
         integrity = "sha512-fnULvOpxnC5/Vg3NCiWelDsLiUc9bRwAPs/+LfTLNvetFCtCTN+yQz15C/fs4AwX1R9K5GLtLfn8QW+dWisaAw==";
         dependencies."@babel/runtime" = "^7.21.0";
       };
+      "pbplugins/${member}/node_modules/yaml" = {
+        version = "1.10.2";
+        resolved = "https://registry.npmjs.org/yaml/-/yaml-1.10.2.tgz";
+        integrity = "sha512-r3vXyErRCYJ7wg28yvBY5VSoAF8ZvlcW9/BwUzEtUsjvX/DKs24dIkuwjtuprwJJHsbyUbLApepYTR1BN4uHrg==";
+      };
     };
   };
-  # The same lock after Pi's moved on: yaml is at another version than the release's.
+  # The lock after Pi's moved on: one of its packages is at another version than the release's.
   stalePluginLock = lib.recursiveUpdate pluginLock {
     packages."node_modules/yaml".version = "0.0.0";
+  };
+  # A lock that lists a plugin this package does not compile.
+  unknownPluginLock = lib.recursiveUpdate pluginLock {
+    packages."pbplugins/ghost".version = "0.0.0";
   };
 
   built =
@@ -130,10 +151,10 @@ runCommand "pi-bolt-plugins-check" { } ''
     echo "expected the compiled-in consumer's model ${expected}" >&2
     exit 1
   }
-  # The dependency the lock supplied is staged for the plugin that has no node_modules of its own.
+  # What the lock installed is staged for the plugin that has no node_modules of its own.
   ${lib.getExe built} --list-models pi-bolt-lock > lock.txt 2>&1 || { cat lock.txt; exit 1; }
-  grep -q -- 'lock-2000' lock.txt || {
-    echo "expected lockdep's model, which carries date-fns's output" >&2
+  grep -q -- 'lock-2000-yaml-1.10.2' lock.txt || {
+    echo "expected lockdep's model: date-fns from the lock, and its own yaml, not Pi's" >&2
     exit 1
   }
   # Turned off as any built-in is: no model.

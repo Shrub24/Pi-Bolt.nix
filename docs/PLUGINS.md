@@ -45,33 +45,40 @@ Dependencies matter only where the compile happens. A plugin loaded at run time 
 
 A compiled plugin's npm imports must be staged at build. There are two ways, and they can be mixed per plugin.
 
-**One lock for the set (`pluginLock`).** One npm lock covers every compiled plugin, so each library is bundled once, and Pi's
-own packages (`yaml`, `undici` and the rest) resolve from Pi, never staged again. The plugins keep a plain `package.json` and need
-no `nodeModules`.
+**One lock for the set (`pluginLock`).** One npm lock covers every compiled plugin. Each plugin is an npm workspace of Pi's own
+tree: a package Pi already has at a version the plugin accepts is shared, one Pi lacks is added beside Pi's, and one that needs a
+different version than Pi's is installed under that plugin's own folder. Pi's packages are never moved or reinstalled, and a
+library two plugins share is bundled once. The plugins keep a plain `package.json` and need no `nodeModules`.
 
 ```nix
 (pkgs.pi-bolt.withPlugins (_: [ pluginA pluginB ])).override { pluginLock = ./plugins.lock.json; }
 ```
 
-The lock is Pi's own lock with your plugins' `dependencies` added. Generate it where you update the plugins, never at build:
+Generate the lock where you update the plugins, never at build. Give each plugin by its `pluginName` and its `package.json`, a
+folder holding one, or its npm tarball:
 
 ```sh
-$(nix build --no-link --print-out-paths .#pi-bolt.updatePluginLock)/bin/update-plugin-lock plugins.lock.json <plugin folder>...
+$(nix build --no-link --print-out-paths .#pi-bolt.updatePluginLock)/bin/update-plugin-lock plugins.lock.json \
+  word-count=./word-count/package.json pi-radar=./pi-radar-0.5.1.tgz
 ```
 
-Each folder holds a plugin's `package.json` (a published package unpacked, or a checkout). It asks the registry to resolve the
-declared ranges, so it needs network, and the result is committed. The plugins must agree on one range per package; it names the
-ones that do not. Peer dependencies are not installed.
+It asks the registry to resolve the declared ranges, so it needs network, and the result is committed. A plugin's
+`devDependencies` and scripts are not installed. A package a plugin only needs as a peer is not added unless something
+installs it as a peer dependency, so declare what a plugin imports in its `dependencies`. List every plugin that has
+dependencies; a plugin left out of the lock is not installed, and the build says what it lacks (below).
 
-Two checks make a stale lock fail early:
+Three checks make a stale lock fail early:
 
 - When the release changes Pi's lock, a committed `pluginLock` no longer extends it, and evaluation fails with
-  `pluginLock is stale`. Regenerate it after bumping this flake.
+  `pluginLock is stale`. It fails the same way for a lock that lists a plugin this package does not compile. Regenerate the lock
+  after bumping this flake or changing the plugin set.
+- A plugin whose `package.json` `dependencies` differ from the ones its entry in the lock was generated from (a pin moved)
+  fails the build, before npm runs, naming the plugin, the package and both ranges.
 - At the start of the compile, each plugin's declared `dependencies` are compared with what is staged for it. A dependency that is
   missing, or staged at a version outside the declared range, fails the build and names the plugin, the package, the range and
   the version.
 
-The check covers `dependencies`, not imports a plugin never declared: one that works because another plugin or Pi provides the
+The checks cover `dependencies`, not imports a plugin never declared: one that works because another plugin or Pi provides the
 package is the plugin's defect.
 
 **A folder per plugin (`nodeModules`).** For a plugin that must pin its own versions, or whose lock is not an npm lock, build a

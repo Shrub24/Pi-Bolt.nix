@@ -41,5 +41,17 @@ runCommand "pi-bolt-plugin-dependencies-check" { nativeBuildInputs = [ nodejs ];
   # A staged sibling plugin is checked by its own build, and a git source names itself.
   check '{ "sibling": "9.0.0" }' sibling
   check '{ "foo": "github:owner/foo" }'
+
+  # check-lock.js: a plugin's package.json must be what its entry in the lock was generated from.
+  locked() {
+    rm -rf members; mkdir -p members/p
+    printf '{ "name": "p", "version": "0.0.0", "dependencies": %s }' "$1" > members/p/package.json
+    echo '{ "packages": { "pbplugins/p": { "version": "0.0.0", "dependencies": { "foo": "^1.1.0" } } } }' > lock.json
+    node ${../plugins/check-lock.js} lock.json members
+  }
+  locked '{ "foo": "^1.1.0" }'
+  # A pin that moved after the lock was written is named, with both ranges.
+  if locked '{ "foo": "^1.3.0" }' 2> moved.txt; then echo "accepted a moved pin" >&2; exit 1; fi
+  grep -qF 'p: foo is ^1.3.0 in its package.json, ^1.1.0 in the lock' moved.txt || { cat moved.txt >&2; exit 1; }
   touch $out
 ''
