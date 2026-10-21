@@ -43,6 +43,7 @@ in
       "scripts"
       "patches"
       "profiles"
+      "docs"
       "VERSION"
       "sources.json"
     ]
