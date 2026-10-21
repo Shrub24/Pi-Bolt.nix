@@ -16,6 +16,8 @@ args@{
   rsync,
   autoPatchelfHook,
   writeText,
+  nodejs,
+  importNpmLock,
   libxcb,
   ripgrep,
   fd,
@@ -29,6 +31,10 @@ args@{
 
   # Plugins to compile in: buildPiBoltPlugin derivations. Each is a built-in extension, builtin:<name>.
   plugins ? [ ],
+  # One npm lock for the plugins' dependencies: Pi's own lock with the plugins' packages added, as `update-plugin-lock` writes it.
+  # A path to the file, or the parsed lock. What it adds is staged beside Pi's modules; null leaves each plugin its own
+  # node_modules (buildPiBoltPlugin's nodeModules). docs/PLUGINS.md, "Dependencies".
+  pluginLock ? null,
   # Launchers to install beside the executable: name → { env, path }. Each gets a `bin/<name>`, and the `pi` it runs is this
   # package's, so there is one copy of lib/pi-bolt and `pi-bolt doctor` counts each launcher as this installation. `pi-bolt` is
   # always present and can be overridden by name. `path` adds to the package's tools.
@@ -73,6 +79,37 @@ stdenvNoCC.mkDerivation (
       "${lib.substring 0 4 stamp}-${lib.substring 4 2 stamp}-${lib.substring 6 2 stamp}";
     label =
       if (source.rev or null) == (release.rev or null) then version else "${version}-unstable-${date}";
+
+    # The lock's additions to Pi's own, as folders of the realised workspace. Pi's entries must come through unchanged: a lock
+    # written for another release no longer describes the packages the workspace holds.
+    releaseLock =
+      (builtins.fromJSON (builtins.readFile "${source.outPath}/package-lock.json")).packages;
+    unionLock =
+      if lib.isAttrs pluginLock then pluginLock else builtins.fromJSON (builtins.readFile pluginLock);
+    addedPackages =
+      let
+        changed = lib.attrNames (
+          lib.filterAttrs (key: entry: key != "" && (unionLock.packages.${key} or null) != entry) releaseLock
+        );
+        added = lib.filter (key: !(releaseLock ? ${key})) (lib.attrNames unionLock.packages);
+      in
+      assert lib.assertMsg (changed == [ ])
+        "pi-bolt: pluginLock is stale: the release's lock changed at ${lib.concatStringsSep ", " (lib.take 5 changed)}${
+          lib.optionalString (lib.length changed > 5) " and ${toString (lib.length changed - 5)} more"
+        }; regenerate it with update-plugin-lock";
+      assert lib.assertMsg (lib.all (lib.hasPrefix "node_modules/") added)
+        "pi-bolt: pluginLock adds entries outside node_modules: ${
+          lib.concatStringsSep ", " (lib.filter (key: !lib.hasPrefix "node_modules/" key) added)
+        }";
+      # A package nested in another added one comes with it.
+      lib.filter (key: !lib.any (other: other != key && lib.hasPrefix "${other}/" key) added) added;
+    pluginModules = importNpmLock.buildNodeModules {
+      npmRoot = sources.workspace;
+      package = unionLock.packages."";
+      packageLock = unionLock;
+      inherit nodejs;
+      derivationArgs.npmRebuildFlags = [ "--ignore-scripts" ];
+    };
 
     workspace = callPackage ./workspace.nix {
       src = sources.workspace;
@@ -163,6 +200,19 @@ stdenvNoCC.mkDerivation (
       ) linked
     ) checkedClosure;
 
+    # What check-dependencies.js verifies: each plugin's declared packages against what is staged for it.
+    dependencySpec = writeText "plugin-dependencies.json" (
+      builtins.toJSON (
+        map (plugin: {
+          name = plugin.piBolt.name;
+          dir = "plugins/${plugin.piBolt.name}";
+          skip = map (dep: dep.piBolt.packageName) (
+            lib.filter (dep: dep.piBolt.packageName != null) plugin.piBolt.dependencies
+          );
+        }) checkedClosure
+      )
+    );
+
     workers = lib.concatMap (
       plugin: map (worker: "--plugin-worker ${plugin.piBolt.name}/${worker}") plugin.piBolt.workers
     ) checkedClosure;
@@ -178,6 +228,7 @@ stdenvNoCC.mkDerivation (
         python3
         rsync
         autoPatchelfHook
+        nodejs
       ];
       # The native module Pi's TUI loads to read the keyboard's modifiers under X11.
       buildInputs = [ libxcb ];
@@ -189,6 +240,16 @@ stdenvNoCC.mkDerivation (
         chmod -R u+w tree
         cp -a ${workspace}/. tree
         chmod -R u+w tree
+        ${lib.optionalString (pluginLock != null) (
+          lib.concatMapStrings (key: ''
+            [ ! -e ${lib.escapeShellArg "tree/${key}"} ] || {
+              echo "pi-bolt: pluginLock adds ${key}, which the workspace has" >&2
+              exit 1
+            }
+            mkdir -p "$(dirname ${lib.escapeShellArg "tree/${key}"})"
+            cp -r --no-preserve=mode ${lib.escapeShellArg "${pluginModules}/${key}"} ${lib.escapeShellArg "tree/${key}"}
+          '') addedPackages
+        )}
         # The runtime is an engine: a source that changes it (webkit, bun, their patches) needs a runtime of its own. Checked on
         # the store copy, since patchShebangs rewrites the scripts the stamp hashes.
         stamp=$(bash ${sources.compile}/scripts/runtime-stamp.sh)
@@ -207,6 +268,7 @@ stdenvNoCC.mkDerivation (
           mkdir plugins
           ${stagePlugins}
           cp ${manifest} plugins/plugins.ts
+          node ${./plugins/check-dependencies.js} ${nodejs}/lib/node_modules/npm/node_modules/semver tree/node_modules ${dependencySpec}
         ''}
         runHook postBuild
       '';
@@ -348,6 +410,8 @@ stdenvNoCC.mkDerivation (
         ;
       plugins = finalAttrs.plugins;
       runtimeInputs = toolInputs;
+      # Writes the lock `pluginLock` takes, for the source this package compiles.
+      updatePluginLock = callPackage ./update-plugin-lock.nix { inherit source; };
       # Through callPackage again, so that the result carries `override` too: `(pi-bolt.withPlugins f).override { jit = true; }`.
       withPlugins = select: callPackage ./pi-bolt.nix (args // { plugins = select piBoltPlugins; });
     };

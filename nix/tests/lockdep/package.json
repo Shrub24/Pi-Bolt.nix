@@ -1,0 +1,8 @@
+{
+  "name": "pi-bolt-check-lockdep",
+  "version": "0.0.0",
+  "private": true,
+  "dependencies": {
+    "date-fns": "2.30.0"
+  }
+}

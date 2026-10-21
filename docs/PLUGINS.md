@@ -31,7 +31,7 @@ piBoltPlugins.buildPiBoltPlugin {
 | `pluginName` | The name Pi uses: `builtin:<pluginName>`. Defaults to `pname`. |
 | `packageName` | The plugin's `package.json` `name`, needed when another plugin imports it through `dependencies`. |
 | `dependencies` | Other `buildPiBoltPlugin` plugins this one imports. |
-| `nodeModules` | A `node_modules` folder for the npm packages it imports. |
+| `nodeModules` | A `node_modules` folder for the npm packages it imports, when the set has no `pluginLock` (see below). |
 | `runtimeInputs` | Programs it needs on `PATH`. Its dependencies' programs are included. |
 | `workers` | Worker scripts it starts, relative to its root. Each is compiled as an entry point. |
 | `builtin` | `true` (default) compiles it in as `builtin:<pluginName>`. `false` compiles it in as an unnamed extension that a selection cannot switch off. |
@@ -41,8 +41,42 @@ Pi provides its own packages (`@earendil-works/pi-*` and `typebox`). The builder
 
 ### npm dependencies
 
-A plugin that imports an npm package needs that package in its own `node_modules`. Build the folder from the plugin's lockfile
-with nixpkgs' `importNpmLock`:
+Dependencies matter only where the compile happens. A plugin loaded at run time needs no closure from this package.
+
+A compiled plugin's npm imports must be staged at build. There are two ways, and they can be mixed per plugin.
+
+**One lock for the set (`pluginLock`).** One npm lock covers every compiled plugin, so each library is bundled once, and Pi's
+own packages (`yaml`, `undici` and the rest) resolve from Pi, never staged again. The plugins keep a plain `package.json` and need
+no `nodeModules`.
+
+```nix
+(pkgs.pi-bolt.withPlugins (_: [ pluginA pluginB ])).override { pluginLock = ./plugins.lock.json; }
+```
+
+The lock is Pi's own lock with your plugins' `dependencies` added. Generate it where you update the plugins, never at build:
+
+```sh
+$(nix build --no-link --print-out-paths .#pi-bolt.updatePluginLock)/bin/update-plugin-lock plugins.lock.json <plugin folder>...
+```
+
+Each folder holds a plugin's `package.json` (a published package unpacked, or a checkout). It asks the registry to resolve the
+declared ranges, so it needs network, and the result is committed. The plugins must agree on one range per package; it names the
+ones that do not. Peer dependencies are not installed.
+
+Two checks make a stale lock fail early:
+
+- When the release changes Pi's lock, a committed `pluginLock` no longer extends it, and evaluation fails with
+  `pluginLock is stale`. Regenerate it after bumping this flake.
+- At the start of the compile, each plugin's declared `dependencies` are compared with what is staged for it. A dependency that is
+  missing, or staged at a version outside the declared range, fails the build and names the plugin, the package, the range and
+  the version.
+
+The check covers `dependencies`, not imports a plugin never declared: one that works because another plugin or Pi provides the
+package is the plugin's defect.
+
+**A folder per plugin (`nodeModules`).** For a plugin that must pin its own versions, or whose lock is not an npm lock, build a
+`node_modules` folder any way you like and pass it. Each such plugin is bundled with its own copy of what it carries, so a
+library two plugins share is in the executable twice. Build the folder from the plugin's npm lock with `importNpmLock`:
 
 ```nix
 piBoltPlugins.buildPiBoltPlugin {

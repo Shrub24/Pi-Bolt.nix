@@ -12,6 +12,8 @@
   nodejs,
   pi-bolt,
   piBoltPlugins,
+  # The source pi-bolt compiles: its lock is what the fixture plugin lock extends.
+  source,
 }:
 let
   inherit (piBoltPlugins) buildPiBoltPlugin;
@@ -45,12 +47,39 @@ let
     '';
   };
 
-  built = pi-bolt.withPlugins (ps: [
-    ps.word-count
-    helper
-    consumer
-    helper
-  ]);
+  # No node_modules of its own: date-fns comes from the set's lock.
+  lockdep = buildPiBoltPlugin {
+    pname = "pi-bolt-check-lockdep";
+    src = ./lockdep;
+    entry = "index.ts";
+  };
+  # Pi's lock with date-fns@2.30.0 added: what update-plugin-lock writes for lockdep. (@babel/runtime, which it needs, is Pi's.)
+  releaseLock = builtins.fromJSON (builtins.readFile "${source}/package-lock.json");
+  pluginLock = lib.recursiveUpdate releaseLock {
+    packages = {
+      "".dependencies.date-fns = "2.30.0";
+      "node_modules/date-fns" = {
+        version = "2.30.0";
+        resolved = "https://registry.npmjs.org/date-fns/-/date-fns-2.30.0.tgz";
+        integrity = "sha512-fnULvOpxnC5/Vg3NCiWelDsLiUc9bRwAPs/+LfTLNvetFCtCTN+yQz15C/fs4AwX1R9K5GLtLfn8QW+dWisaAw==";
+        dependencies."@babel/runtime" = "^7.21.0";
+      };
+    };
+  };
+  # The same lock after Pi's moved on: yaml is at another version than the release's.
+  stalePluginLock = lib.recursiveUpdate pluginLock {
+    packages."node_modules/yaml".version = "0.0.0";
+  };
+
+  built =
+    (pi-bolt.withPlugins (ps: [
+      ps.word-count
+      helper
+      consumer
+      helper
+      lockdep
+    ])).override
+      { inherit pluginLock; };
   # What a consumer that wants a plugin at run time owns: its own launcher, the plugin's store path and its tools.
   runtime = runCommand "pi-bolt-runtime-check" { nativeBuildInputs = [ makeBinaryWrapper ]; } ''
     mkdir -p $out/bin
@@ -73,6 +102,10 @@ let
 in
 # Two plugins of one name are refused when the executable's derivation is evaluated.
 assert !(builtins.tryEval conflicting.unwrapped.drvPath).success;
+# A lock written for another release is refused when the executable's derivation is evaluated, a current one is not.
+assert (builtins.tryEval built.unwrapped.drvPath).success;
+assert
+  !(builtins.tryEval (built.override { pluginLock = stalePluginLock; }).unwrapped.drvPath).success;
 # A plugin given no version still has a name (its default is "0").
 assert
   (buildPiBoltPlugin {
@@ -95,6 +128,12 @@ runCommand "pi-bolt-plugins-check" { } ''
   cat models.txt
   grep -q -- '${expected}' models.txt || {
     echo "expected the compiled-in consumer's model ${expected}" >&2
+    exit 1
+  }
+  # The dependency the lock supplied is staged for the plugin that has no node_modules of its own.
+  ${lib.getExe built} --list-models pi-bolt-lock > lock.txt 2>&1 || { cat lock.txt; exit 1; }
+  grep -q -- 'lock-2000' lock.txt || {
+    echo "expected lockdep's model, which carries date-fns's output" >&2
     exit 1
   }
   # Turned off as any built-in is: no model.
