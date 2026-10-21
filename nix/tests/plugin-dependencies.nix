@@ -38,6 +38,10 @@ runCommand "pi-bolt-plugin-dependencies-check" { nativeBuildInputs = [ nodejs ];
   refused 'bar 1.0.0 is declared but not staged' '{ "bar": "1.0.0" }'
   # The plugin's own copy is what it resolves, before the host's.
   stage='package plugins/p/node_modules/foo 2.0.0' check '{ "foo": "2.0.0" }'
+  # What Pi provides is routed to Pi's own copy whatever the plugin declares, so no range of it is checked.
+  package host/typebox 1.3.0
+  check '{ "typebox": "^1.4.0" }'
+  check '{ "@earendil-works/pi-ai": "^9.0.0" }'
   # A staged sibling plugin is checked by its own build, and a git source names itself.
   check '{ "sibling": "9.0.0" }' sibling
   check '{ "foo": "github:owner/foo" }'

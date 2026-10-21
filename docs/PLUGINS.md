@@ -76,7 +76,7 @@ Three checks make a stale lock fail early:
   fails the build, before npm runs, naming the plugin, the package and both ranges.
 - At the start of the compile, each plugin's declared `dependencies` are compared with what is staged for it. A dependency that is
   missing, or staged at a version outside the declared range, fails the build and names the plugin, the package, the range and
-  the version.
+  the version. Packages Pi provides (`@earendil-works/pi-*` and `typebox`) are not checked: Pi routes a plugin's imports of them to its own copy, whatever range the plugin declares, so declare them as `peerDependencies`.
 
 The checks cover `dependencies`, not imports a plugin never declared: one that works because another plugin or Pi provides the
 package is the plugin's defect.
