@@ -9,8 +9,10 @@ const lock = JSON.parse(fs.readFileSync(lockFile, "utf8"));
 
 const problems = [];
 for (const name of fs.readdirSync(membersDir)) {
-	const declared = JSON.parse(fs.readFileSync(path.join(membersDir, name, "package.json"), "utf8")).dependencies ?? {};
-	const locked = lock.packages[`pbplugins/${name}`]?.dependencies ?? {};
+	const manifest = JSON.parse(fs.readFileSync(path.join(membersDir, name, "package.json"), "utf8"));
+	const entry = lock.packages[`pbplugins/${name}`];
+	const declared = { ...manifest.optionalDependencies, ...manifest.dependencies };
+	const locked = { ...entry?.optionalDependencies, ...entry?.dependencies };
 	for (const dependency of new Set([...Object.keys(declared), ...Object.keys(locked)])) {
 		if (declared[dependency] !== locked[dependency]) {
 			problems.push(

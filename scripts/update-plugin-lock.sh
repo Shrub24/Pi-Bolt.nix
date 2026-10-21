@@ -44,12 +44,16 @@ for spec in "$@"; do
     exit 1
   fi
   mkdir -p "$work/pbplugins/$name"
-  # The same fields pi-bolt compiles from (nix/pi-bolt.nix): a plugin's dev dependencies and scripts are not installed.
-  jq '{ name, version, dependencies } | with_entries(select(.value != null))' <<<"$manifest" >"$work/pbplugins/$name/package.json"
+  # The same fields pi-bolt compiles from (nix/pi-bolt.nix), and what Pi installs a package with (--omit=dev): a plugin's dev
+  # dependencies and scripts are not installed.
+  jq '{ name, version, dependencies, optionalDependencies } | with_entries(select(.value != null))' <<<"$manifest" >"$work/pbplugins/$name/package.json"
 done
 
 jq '.workspaces += ["pbplugins/*"]' "$work/package.json" >"$work/package.json.new"
 mv "$work/package.json.new" "$work/package.json"
-(cd "$work" && npm install --package-lock-only --ignore-scripts --no-audit --no-fund >/dev/null)
+# --legacy-peer-deps, as Pi's own package installer passes it (package-manager.ts): npm would otherwise install the peers of a
+# plugin's dependencies, which for Pi's packages under their old names (@mariozechner/pi-*) is a second Pi. A plugin declares what
+# it imports in `dependencies`. nix/pi-bolt.nix installs the lock with the same flag.
+(cd "$work" && npm install --package-lock-only --ignore-scripts --legacy-peer-deps --no-audit --no-fund >/dev/null)
 cp "$work/package-lock.json" "$out"
 echo "wrote $out"

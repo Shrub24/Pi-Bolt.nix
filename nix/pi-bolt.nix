@@ -161,7 +161,7 @@ stdenvNoCC.mkDerivation (
     # Each workspace plugin's package.json as the lock was generated from it.
     stageMembers = lib.concatMapStrings (plugin: ''
       mkdir -p tree/pbplugins/${plugin.piBolt.name}
-      jq '{ name, version, dependencies } | with_entries(select(.value != null))' ${plugin}/package.json \
+      jq '{ name, version, dependencies, optionalDependencies } | with_entries(select(.value != null))' ${plugin}/package.json \
         > tree/pbplugins/${plugin.piBolt.name}/package.json
     '') lockedPlugins;
 
@@ -384,6 +384,8 @@ stdenvNoCC.mkDerivation (
         # What npmConfigHook installs: the plugin lock, onto the tree (preConfigure).
         npmDeps = pluginDeps;
         npmRoot = "tree";
+        # As update-plugin-lock resolved the lock: without it npm would look, offline, for the peers the lock leaves out.
+        npmFlags = [ "--legacy-peer-deps" ];
         npmRebuildFlags = [ "--ignore-scripts" ];
       }
     );

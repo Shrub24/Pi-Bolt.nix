@@ -54,6 +54,10 @@ runCommand "pi-bolt-plugin-dependencies-check" { nativeBuildInputs = [ nodejs ];
     node ${../plugins/check-lock.js} lock.json members
   }
   locked '{ "foo": "^1.1.0" }'
+  # An optional dependency is part of what the lock was generated from.
+  printf '{ "name": "p", "version": "0.0.0", "dependencies": { "foo": "^1.1.0" }, "optionalDependencies": { "bar": "^2.0.0" } }' > members/p/package.json
+  if node ${../plugins/check-lock.js} lock.json members 2> optional.txt; then echo "ignored an optional dependency the lock lacks" >&2; exit 1; fi
+  grep -qF 'p: bar is ^2.0.0 in its package.json, not in the lock' optional.txt || { cat optional.txt >&2; exit 1; }
   # A pin that moved after the lock was written is named, with both ranges.
   if locked '{ "foo": "^1.3.0" }' 2> moved.txt; then echo "accepted a moved pin" >&2; exit 1; fi
   grep -qF 'p: foo is ^1.3.0 in its package.json, ^1.1.0 in the lock' moved.txt || { cat moved.txt >&2; exit 1; }

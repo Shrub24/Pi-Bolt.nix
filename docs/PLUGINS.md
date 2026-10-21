@@ -63,8 +63,9 @@ $(nix build --no-link --print-out-paths .#pi-bolt.updatePluginLock)/bin/update-p
 ```
 
 It asks the registry to resolve the declared ranges, so it needs network, and the result is committed. A plugin's
-`devDependencies` and scripts are not installed. A package a plugin only needs as a peer is not added unless something
-installs it as a peer dependency, so declare what a plugin imports in its `dependencies`. List every plugin that has
+`devDependencies` and scripts are not installed; `optionalDependencies` are, for the platforms that match. Peer
+dependencies are not installed, as when Pi installs a package itself (it passes `--legacy-peer-deps`, so that npm does not
+install a second Pi or an old one for a package that peers on it): declare what a plugin imports in its `dependencies`. List every plugin that has
 dependencies; a plugin left out of the lock is not installed, and the build says what it lacks (below).
 
 Three checks make a stale lock fail early:
