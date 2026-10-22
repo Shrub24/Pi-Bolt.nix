@@ -45,10 +45,14 @@ Dependencies matter only where the compile happens. A plugin loaded at run time 
 
 A compiled plugin's npm imports must be staged at build. There are two ways, and they can be mixed per plugin.
 
-**One lock for the set (`pluginLock`).** One npm lock covers every compiled plugin. Each plugin is an npm workspace of Pi's own
-tree: a package Pi already has at a version the plugin accepts is shared, one Pi lacks is added beside Pi's, and one that needs a
-different version than Pi's is installed under that plugin's own folder. Pi's packages are never moved or reinstalled, and a
-library two plugins share is bundled once. The plugins keep a plain `package.json` and need no `nodeModules`.
+**One lock for the set (`pluginLock`).** One npm lock covers every compiled plugin. It is a standalone npm project with each
+plugin as a workspace: a package two plugins share is one copy, and one that needs another version than a sibling gets it
+nested under that plugin. The plugins keep a plain `package.json` and need no `nodeModules`.
+
+The tree it installs is `plugins/node_modules`, which a compiled plugin resolves before Pi's own `node_modules`: a package the
+lock pins is the version the plugin gets, even where Pi carries another, and Pi's own packages stay visible to plugins that do
+not pin them. Pi is not part of the lock, so bumping this flake does not invalidate it: regenerate it when the plugin set
+changes, not when the release does.
 
 ```nix
 (pkgs.pi-bolt.withPlugins (_: [ pluginA pluginB ])).override { pluginLock = ./plugins.lock.json; }
@@ -63,28 +67,28 @@ $(nix build --no-link --print-out-paths .#pi-bolt.updatePluginLock)/bin/update-p
 ```
 
 It asks the registry to resolve the declared ranges, so it needs network, and the result is committed. A plugin's
-`devDependencies` and scripts are not installed; `optionalDependencies` are, for the platforms that match. Peer
-dependencies are not installed, as when Pi installs a package itself (it passes `--legacy-peer-deps`, so that npm does not
-install a second Pi or an old one for a package that peers on it): declare what a plugin imports in its `dependencies`. List every plugin that has
+`devDependencies` and scripts are not installed; `optionalDependencies` are, for the platforms that match. Peer dependencies are
+not installed, as when Pi installs a package itself (it passes `--legacy-peer-deps`, so that npm does not install a second Pi or
+an old one for a package that peers on it): declare what a plugin imports in its `dependencies`. List every plugin that has
 dependencies; a plugin left out of the lock is not installed, and the build says what it lacks (below).
 
-Three checks make a stale lock fail early:
+Two things fail the build early:
 
-- When the release changes Pi's lock, a committed `pluginLock` no longer extends it, and evaluation fails with
-  `pluginLock is stale`. It fails the same way for a lock that lists a plugin this package does not compile. Regenerate the lock
-  after bumping this flake or changing the plugin set.
-- A plugin whose `package.json` `dependencies` differ from the ones its entry in the lock was generated from (a pin moved)
-  fails the build, before npm runs, naming the plugin, the package and both ranges.
-- At the start of the compile, each plugin's declared `dependencies` are compared with what is staged for it. A dependency that is
-  missing, or staged at a version outside the declared range, fails the build and names the plugin, the package, the range and
-  the version. Packages Pi provides (`@earendil-works/pi-*` and `typebox`) are not checked: Pi routes a plugin's imports of them to its own copy, whatever range the plugin declares, so declare them as `peerDependencies`.
+- A lock that lists a plugin this package does not compile is refused at evaluation (`pluginLock has …, which this package does
+  not compile`): the lock was written for another plugin set. Regenerate it.
+- At the start of the compile, each plugin's declared `dependencies` are compared with what is staged for it, in the order the
+  plugin resolves them: its own `node_modules`, then the lock's tree, then Pi's. A dependency that is missing, or staged at a
+  version outside the declared range, fails the build and names the plugin, the package, the range and the version. Packages Pi
+  provides (`@earendil-works/pi-*` and `typebox`) are not checked: Pi routes a plugin's imports of them to its own copy, whatever
+  range the plugin declares, so declare them as `peerDependencies`.
 
 The checks cover `dependencies`, not imports a plugin never declared: one that works because another plugin or Pi provides the
 package is the plugin's defect.
 
-**A folder per plugin (`nodeModules`).** For a plugin that must pin its own versions, or whose lock is not an npm lock, build a
-`node_modules` folder any way you like and pass it. Each such plugin is bundled with its own copy of what it carries, so a
-library two plugins share is in the executable twice. Build the folder from the plugin's npm lock with `importNpmLock`:
+**A folder per plugin (`nodeModules`).** For a plugin that must pin its own versions, or whose dependencies are not in the
+set's lock, build a `node_modules` folder any way you like and pass it. Each such plugin is bundled with its own copy of what it
+carries, so a library two plugins share is in the executable twice. Build the folder from the plugin's npm lock with
+`importNpmLock`:
 
 ```nix
 piBoltPlugins.buildPiBoltPlugin {

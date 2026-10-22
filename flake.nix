@@ -53,7 +53,7 @@
 
       checks = forAllSystems (pkgs: {
         # The plugin contract: compiled in, and loaded from the store.
-        plugins = pkgs.callPackage ./nix/tests { source = pi-bolt-source; };
+        plugins = pkgs.callPackage ./nix/tests { };
         # The launcher generator: env, PATH and argv, and that the launcher still finds pi when moved.
         launcher = pkgs.callPackage ./nix/tests/launcher.nix { };
         # The plugin builder keeps the caller's passthru, build flags and nativeBuildInputs.

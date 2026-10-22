@@ -1,5 +1,5 @@
 # check-dependencies.js: what a compiled plugin declares must be what is staged for it. The cases are the incident this guards
-# (a pin older than the range the plugin declares) and the two places a package can be staged.
+# (a pin older than the range the plugin declares) and the three places a package can be staged.
 {
   runCommand,
   nodejs,
@@ -13,10 +13,11 @@ runCommand "pi-bolt-plugin-dependencies-check" { nativeBuildInputs = [ nodejs ];
 
   # check <plugin's declared dependencies> [skipped package]: runs the check on one plugin, with foo staged in the host.
   check() {
-    rm -rf plugins; package plugins/p 0.0.0 "$1"
+    rm -rf plugins set; package plugins/p 0.0.0 "$1"
     ''${stage:-:}
+    ''${setStage:-:}
     echo "[{ \"name\": \"p\", \"dir\": \"plugins/p\", \"skip\": [\"''${2:-}\"] }]" > spec.json
-    node ${../plugins/check-dependencies.js} $semver host spec.json
+    node ${../plugins/check-dependencies.js} $semver set host spec.json
   }
 
   # refused <message>: the check must fail, and say that.
@@ -36,8 +37,10 @@ runCommand "pi-bolt-plugin-dependencies-check" { nativeBuildInputs = [ nodejs ];
   refused 'foo ^1.3.0 is declared, 1.2.0 is staged' '{ "foo": "^1.3.0" }'
   # A package that is not staged is named.
   refused 'bar 1.0.0 is declared but not staged' '{ "bar": "1.0.0" }'
-  # The plugin's own copy is what it resolves, before the host's.
+  # The plugin's own copy is what it resolves, before the set's and the host's.
   stage='package plugins/p/node_modules/foo 2.0.0' check '{ "foo": "2.0.0" }'
+  # The set's tree is resolved before Pi's, as a compiled plugin's imports are: the lock's version answers for the range.
+  setStage='package set/foo 1.5.0' check '{ "foo": "^1.5.0" }'
   # What Pi provides is routed to Pi's own copy whatever the plugin declares, so no range of it is checked.
   package host/typebox 1.3.0
   check '{ "typebox": "^1.4.0" }'
@@ -46,20 +49,5 @@ runCommand "pi-bolt-plugin-dependencies-check" { nativeBuildInputs = [ nodejs ];
   check '{ "sibling": "9.0.0" }' sibling
   check '{ "foo": "github:owner/foo" }'
 
-  # check-lock.js: a plugin's package.json must be what its entry in the lock was generated from.
-  locked() {
-    rm -rf members; mkdir -p members/p
-    printf '{ "name": "p", "version": "0.0.0", "dependencies": %s }' "$1" > members/p/package.json
-    echo '{ "packages": { "pbplugins/p": { "version": "0.0.0", "dependencies": { "foo": "^1.1.0" } } } }' > lock.json
-    node ${../plugins/check-lock.js} lock.json members
-  }
-  locked '{ "foo": "^1.1.0" }'
-  # An optional dependency is part of what the lock was generated from.
-  printf '{ "name": "p", "version": "0.0.0", "dependencies": { "foo": "^1.1.0" }, "optionalDependencies": { "bar": "^2.0.0" } }' > members/p/package.json
-  if node ${../plugins/check-lock.js} lock.json members 2> optional.txt; then echo "ignored an optional dependency the lock lacks" >&2; exit 1; fi
-  grep -qF 'p: bar is ^2.0.0 in its package.json, not in the lock' optional.txt || { cat optional.txt >&2; exit 1; }
-  # A pin that moved after the lock was written is named, with both ranges.
-  if locked '{ "foo": "^1.3.0" }' 2> moved.txt; then echo "accepted a moved pin" >&2; exit 1; fi
-  grep -qF 'p: foo is ^1.3.0 in its package.json, ^1.1.0 in the lock' moved.txt || { cat moved.txt >&2; exit 1; }
   touch $out
 ''

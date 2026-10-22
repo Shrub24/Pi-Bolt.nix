@@ -12,8 +12,6 @@
   nodejs,
   pi-bolt,
   piBoltPlugins,
-  # The source pi-bolt compiles: its lock is what the fixture plugin lock extends.
-  source,
 }:
 let
   inherit (piBoltPlugins) buildPiBoltPlugin;
@@ -53,12 +51,43 @@ let
     src = ./lockdep;
     entry = "index.ts";
   };
-  # What update-plugin-lock writes for lockdep, made from the release's lock so that it never goes stale: the plugin as a
-  # workspace, date-fns at the root (Pi has none), and yaml 1.10.2 under the plugin's own folder (Pi has another version).
-  releaseLock = builtins.fromJSON (builtins.readFile "${source}/package-lock.json");
+  # What update-plugin-lock writes for lockdep: a standalone project with the plugin as a workspace. yaml is one Pi has at
+  # another version, and the set's tree is resolved before Pi's, so the plugin gets the lock's.
   member = "pi-bolt-check-lockdep";
-  pluginLock = lib.recursiveUpdate releaseLock {
+  pluginLock = {
+    name = "pi-bolt-plugins";
+    version = "0.0.0";
+    lockfileVersion = 3;
+    requires = true;
     packages = {
+      "" = {
+        name = "pi-bolt-plugins";
+        version = "0.0.0";
+        workspaces = [ "pbplugins/*" ];
+      };
+      "node_modules/@babel/runtime" = {
+        version = "7.29.10";
+        resolved = "https://registry.npmjs.org/@babel/runtime/-/runtime-7.29.10.tgz";
+        integrity = "sha512-NpugTzbKgGrNe45Ui32cN8vCFFMxVtP/9rtfwv0nP5FRDAjvYBxJcLVpYA9mr1jxP6cnIT7x9LUzuDTbWYYNRA==";
+        engines.node = ">=6.9.0";
+      };
+      "node_modules/date-fns" = {
+        version = "2.30.0";
+        resolved = "https://registry.npmjs.org/date-fns/-/date-fns-2.30.0.tgz";
+        integrity = "sha512-fnULvOpxnC5/Vg3NCiWelDsLiUc9bRwAPs/+LfTLNvetFCtCTN+yQz15C/fs4AwX1R9K5GLtLfn8QW+dWisaAw==";
+        dependencies."@babel/runtime" = "^7.21.0";
+        engines.node = ">=0.11";
+      };
+      "node_modules/${member}" = {
+        resolved = "pbplugins/${member}";
+        link = true;
+      };
+      "node_modules/yaml" = {
+        version = "1.10.2";
+        resolved = "https://registry.npmjs.org/yaml/-/yaml-1.10.2.tgz";
+        integrity = "sha512-r3vXyErRCYJ7wg28yvBY5VSoAF8ZvlcW9/BwUzEtUsjvX/DKs24dIkuwjtuprwJJHsbyUbLApepYTR1BN4uHrg==";
+        engines.node = ">= 6";
+      };
       "pbplugins/${member}" = {
         version = "0.0.0";
         dependencies = {
@@ -66,26 +95,7 @@ let
           yaml = "1.10.2";
         };
       };
-      "node_modules/${member}" = {
-        resolved = "pbplugins/${member}";
-        link = true;
-      };
-      "node_modules/date-fns" = {
-        version = "2.30.0";
-        resolved = "https://registry.npmjs.org/date-fns/-/date-fns-2.30.0.tgz";
-        integrity = "sha512-fnULvOpxnC5/Vg3NCiWelDsLiUc9bRwAPs/+LfTLNvetFCtCTN+yQz15C/fs4AwX1R9K5GLtLfn8QW+dWisaAw==";
-        dependencies."@babel/runtime" = "^7.21.0";
-      };
-      "pbplugins/${member}/node_modules/yaml" = {
-        version = "1.10.2";
-        resolved = "https://registry.npmjs.org/yaml/-/yaml-1.10.2.tgz";
-        integrity = "sha512-r3vXyErRCYJ7wg28yvBY5VSoAF8ZvlcW9/BwUzEtUsjvX/DKs24dIkuwjtuprwJJHsbyUbLApepYTR1BN4uHrg==";
-      };
     };
-  };
-  # The lock after Pi's moved on: one of its packages is at another version than the release's.
-  stalePluginLock = lib.recursiveUpdate pluginLock {
-    packages."node_modules/yaml".version = "0.0.0";
   };
   # A lock that lists a plugin this package does not compile.
   unknownPluginLock = lib.recursiveUpdate pluginLock {
@@ -123,10 +133,10 @@ let
 in
 # Two plugins of one name are refused when the executable's derivation is evaluated.
 assert !(builtins.tryEval conflicting.unwrapped.drvPath).success;
-# A lock written for another release is refused when the executable's derivation is evaluated, a current one is not.
 assert (builtins.tryEval built.unwrapped.drvPath).success;
+# A lock listing a plugin this package does not compile is refused, naming it.
 assert
-  !(builtins.tryEval (built.override { pluginLock = stalePluginLock; }).unwrapped.drvPath).success;
+  !(builtins.tryEval (built.override { pluginLock = unknownPluginLock; }).unwrapped.drvPath).success;
 # A plugin given no version still has a name (its default is "0").
 assert
   (buildPiBoltPlugin {
@@ -151,7 +161,8 @@ runCommand "pi-bolt-plugins-check" { } ''
     echo "expected the compiled-in consumer's model ${expected}" >&2
     exit 1
   }
-  # What the lock installed is staged for the plugin that has no node_modules of its own.
+  # What the lock installed is staged for the plugin that has no node_modules of its own, and the set's tree is resolved
+  # before Pi's: yaml is the lock's 1.10.2, not the version Pi carries.
   ${lib.getExe built} --list-models pi-bolt-lock > lock.txt 2>&1 || { cat lock.txt; exit 1; }
   grep -q -- 'lock-2000-yaml-1.10.2' lock.txt || {
     echo "expected lockdep's model: date-fns from the lock, and its own yaml, not Pi's" >&2

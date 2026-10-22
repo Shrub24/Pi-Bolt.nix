@@ -1,9 +1,9 @@
-# Writes the npm lock for a set of compiled plugins (docs/PLUGINS.md, "Dependencies"): Pi's own lock with each plugin added as
-# an npm workspace. Pi's entries stay where they are, a plugin that needs another version of a package gets it nested under its
-# own folder, and one that shares a version shares the copy. Usage: update-plugin-lock OUT NAME=SOURCE...
-# NAME is the plugin's name (its pluginName); SOURCE is its package.json, a folder holding one, or an npm tarball. PI_SOURCE is
-# the Pi-Bolt source the lock extends. The one networked step: it asks the registry to resolve the declared ranges. The result is
-# committed, and nothing resolves at build time.
+# Writes the npm lock for a set of compiled plugins (docs/PLUGINS.md, "npm dependencies"): a standalone npm project with each
+# plugin as a workspace. A package two plugins share is one copy there; one that needs another version than a sibling gets it
+# nested under that plugin. The compile copies the tree into plugins/node_modules, where a plugin resolves it before Pi's own, so
+# Pi is not part of the lock and a Pi-Bolt bump does not invalidate it. Usage: update-plugin-lock OUT NAME=SOURCE...
+# NAME is the plugin's name (its pluginName); SOURCE is its package.json, a folder holding one, or an npm tarball. The one
+# networked step: it asks the registry to resolve the declared ranges. The result is committed, and nothing resolves at build time.
 [ "$#" -ge 2 ] || {
   echo "usage: update-plugin-lock OUT NAME=SOURCE..." >&2
   exit 1
@@ -13,13 +13,7 @@ shift
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-# npm resolves from the package.json files of Pi's workspaces and its lock, which is all it needs of the source.
-(cd "$PI_SOURCE" && find . -name package.json -not -path '*/node_modules/*') | while read -r file; do
-  mkdir -p "$work/$(dirname "$file")"
-  cp "$PI_SOURCE/$file" "$work/$file"
-done
-cp "$PI_SOURCE/package-lock.json" "$work/"
-chmod -R u+w "$work"
+printf '{ "name": "pi-bolt-plugins", "version": "0.0.0", "private": true, "workspaces": ["pbplugins/*"] }' >"$work/package.json"
 
 for spec in "$@"; do
   name=${spec%%=*}
@@ -44,16 +38,14 @@ for spec in "$@"; do
     exit 1
   fi
   mkdir -p "$work/pbplugins/$name"
-  # The same fields pi-bolt compiles from (nix/pi-bolt.nix), and what Pi installs a package with (--omit=dev): a plugin's dev
-  # dependencies and scripts are not installed.
+  # The same fields nix/plugin-set.nix stages, and what Pi installs a package with (--omit=dev): a plugin's dev dependencies and
+  # scripts are not installed.
   jq '{ name, version, dependencies, optionalDependencies } | with_entries(select(.value != null))' <<<"$manifest" >"$work/pbplugins/$name/package.json"
 done
 
-jq '.workspaces += ["pbplugins/*"]' "$work/package.json" >"$work/package.json.new"
-mv "$work/package.json.new" "$work/package.json"
 # --legacy-peer-deps, as Pi's own package installer passes it (package-manager.ts): npm would otherwise install the peers of a
 # plugin's dependencies, which for Pi's packages under their old names (@mariozechner/pi-*) is a second Pi. A plugin declares what
-# it imports in `dependencies`. nix/pi-bolt.nix installs the lock with the same flag.
+# it imports in `dependencies`. nix/plugin-set.nix installs the lock with the same flag.
 (cd "$work" && npm install --package-lock-only --ignore-scripts --legacy-peer-deps --no-audit --no-fund >/dev/null)
 cp "$work/package-lock.json" "$out"
 echo "wrote $out"
