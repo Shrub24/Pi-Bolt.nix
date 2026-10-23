@@ -35,23 +35,26 @@ file contract and errors.
 Pass manifests available **during the update**, not paths frozen from plugin derivations when an updater was evaluated.
 Otherwise a script can move a pin while regenerating the lock from the old manifest.
 
-A recommended organisation is:
+### Recommended shape (optional)
 
-```text
-plugins/
-  plugin-a.nix
-  plugin-a/package.json
-  plugin-b.nix
-  plugin-b/package.json
-  plugins.lock.json
-```
+One update script moves the pins, obtains each plugin's `package.json` in the same run, then calls `update-plugin-lock` once
+with those manifests. Commit the pins, manifests and lock together, so they cannot disagree.
 
-Each plugin definition owns its source pin. Its update step also writes or extracts the matching manifest; after all selected
-updates, invoke `update-plugin-lock` once with those manifest paths. Commit the pins, manifests and lock together.
+The plugin set in [`pkgs/pi-plugins`](https://github.com/Shrub24/nix-dotfiles/tree/main/pkgs/pi-plugins) of the author's
+`nix-dotfiles` is a working sample of this shape:
 
-This is a workflow recommendation, not a required layout. Manifests may be checked in, generated or extracted from archives.
-Any tool producing a compatible npm lock is acceptable. `nix-update` can invoke each plugin's update step, but is optional;
-this package does not provide a member-specific `passthru.updateScript` for the lock.
+- `default.nix` declares the recipes and exposes the updater as `passthru.updateScript`. One updater owns the whole set, because
+  `nix-update` cannot locate individual helper calls.
+- `update.py` moves each npm pin, extracts `package/package.json` from the new tarball, reads directory-shaped plugins' manifests
+  from their checkout input, and runs `update-plugin-lock` once.
+- `plugins.lock.json` is committed beside them.
+- `updateLock` regenerates the lock from the pins already in the tree, for when a checkout input moved a manifest without moving
+  an npm pin.
+
+The sample is one way to organise it, not a requirement. Manifests may be checked in, generated or extracted from archives,
+and any tool that produces a compatible npm lock is acceptable. A `passthru.updateScript` like the sample's lets
+`nix-update --use-update-script` drive it. This package ships no `updateScript` for the lock, because the member list belongs to
+the consumer's plugin set.
 
 For the local [example plugin](https://github.com/Shrub24/Pi-Bolt.nix/tree/main/examples/plugin-set), the update command from the
 repository root is:

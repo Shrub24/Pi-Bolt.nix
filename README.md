@@ -25,6 +25,9 @@ This compiles the example `/words` command into Pi-Bolt. The first build compile
 
 ## Documentation
 
+Published at **<https://shrub24.github.io/Pi-Bolt.nix/>**, built from the Markdown in [`docs/`](docs/index.md) (readable on GitHub too).
+The site describes `main`; for a pinned revision, read `docs/` at that commit.
+
 - [Getting started](docs/getting-started.md): installation, a first plugin and updates.
 - [Documentation index](docs/index.md): guides, interface reference and architecture.
 - [Complete examples](examples/README.md): Home Manager and a custom plugin set.
