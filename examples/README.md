@@ -1,6 +1,14 @@
 # Examples
 
-Apply `pi-bolt-nix.overlays.default` to the package set passed to these examples.
+Start with [installation](../docs/getting-started.md) to configure the flake input and overlay, then copy the chosen example
+into the consuming configuration, preserving its relative paths.
+
+| Example | Includes |
+| --- | --- |
+| [Home Manager](home-manager/default.nix) | A compiled example plugin and generated settings, as a Home Manager module. |
+| [Custom plugin set](plugin-set/default.nix) | A local extension, shared dependency lock, settings and a role launcher. |
+
+Both use `pi-bolt-nix.overlays.default` on the package set passed to them.
 
 ## Home Manager
 
@@ -12,6 +20,8 @@ modules = [ ./examples/home-manager ];
 ```
 
 ## Custom plugin set
+
+With `plugin-set/` beside the Nix file that imports it:
 
 ```nix
 let

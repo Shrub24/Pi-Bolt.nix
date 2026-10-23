@@ -21,6 +21,17 @@ Link upstream for general Nix/Pi/Pi-Bolt behaviour; explain our differences loca
 
 Treat the implementation and observed behaviour as evidence, not an older brief. Verify new claims with source, evaluation or
 a focused build. Label illustrative fragments and unverified limits; remove unsupported measurements and stale recommendations.
+For non-obvious contracts, link to the owning implementation or focused check. Prefer file/section links over brittle line
+numbers; guides need not cite routine Nix conventions.
+
+## Specs and decision records
+
+Public docs describe shipped behaviour. OpenSpec specifications describe intended behaviour; proposals and tasks track pending
+changes. When a change uses OpenSpec, reconcile its public docs before marking it delivered.
+
+Keep-the-Why records durable rationale: decisions, rejected alternatives, constraints and workarounds. Consult existing records
+before changing a non-obvious choice; confirm new rationale with the owner and link to it rather than duplicating it in a guide.
+Use the repository's existing spec/decision locations when present. Routine prose corrections need no new spec or decision record.
 
 ## Author and validate
 

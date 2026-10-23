@@ -54,3 +54,5 @@ dependencies. Raw npm/git/filter entries supply no tool metadata. This value doe
 - Runtime package entries under `closed` have not been behaviourally verified. Extension filtering is not process sandboxing.
 
 For merging and stock-Pi coexistence, see [settings and selections](../guides/settings.md).
+The renderer is in [`nix/settings.nix`](https://github.com/Shrub24/Pi-Bolt.nix/blob/main/nix/settings.nix);
+[`nix/tests/settings.nix`](https://github.com/Shrub24/Pi-Bolt.nix/blob/main/nix/tests/settings.nix) exercises selection and loading.

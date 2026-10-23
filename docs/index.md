@@ -4,17 +4,34 @@ title: Pi-Bolt.nix
 
 # Pi-Bolt.nix
 
-Build [Pi-Bolt](https://github.com/opensec-git/Pi-Bolt) with Nix, optionally compiling Pi extensions into the executable.
-This is an unofficial package for x86_64 and aarch64 Linux.
+Install [Pi-Bolt](https://github.com/opensec-git/Pi-Bolt) through Nix, with optional Pi extensions compiled into the executable.
+Keep the agent, plugin dependencies and launch configuration in the same declarative setup. Runtime-loaded extensions are also
+supported.
+
+This is an unofficial package for **x86_64-linux** and **aarch64-linux**, not a NixOS or Home Manager module. The first build
+compiles from source using Pi-Bolt's released engine; it can take a while.
 
 ## Start using it
 
-[Getting started](getting-started.md) covers installation, Home Manager integration and a first compiled plugin.
+```sh
+nix run github:Shrub24/Pi-Bolt.nix -- --version
+```
+
+[Getting started](getting-started.md) has complete NixOS and standalone Home Manager configurations, guidance for Home Manager
+inside NixOS, and a first compiled plugin. Nix owns this installation; updates go through the consuming flake.
+
+## Adapt an example
+
+- [Home Manager](https://github.com/Shrub24/Pi-Bolt.nix/tree/main/examples/home-manager): a compiled plugin and its generated settings.
+- [Custom plugin set](https://github.com/Shrub24/Pi-Bolt.nix/tree/main/examples/plugin-set): a local extension, shared npm lock,
+  settings and a named launcher.
+
+The [example instructions](https://github.com/Shrub24/Pi-Bolt.nix/blob/main/examples/README.md) explain how to integrate each one.
 
 ## Configure a package
 
 - [Package plugins](guides/plugins.md) from a directory or an archive.
-- [Supply npm dependencies](guides/dependencies.md) with a shared lock or per-plugin modules.
+- [Supply npm dependencies](guides/dependencies.md) with a shared set lock or a plugin's own lock.
 - [Render settings](guides/settings.md) for compiled and runtime plugins, including their skills, prompts and themes.
 - [Add launchers](guides/launchers.md) with different configuration roots and tools.
 - [Build another source](guides/sources.md), such as a fork or a branch.

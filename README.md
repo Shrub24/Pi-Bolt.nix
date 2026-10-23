@@ -4,6 +4,9 @@
 
 Unofficial; not maintained by the Pi-Bolt project. Supports **x86_64-linux** and **aarch64-linux**.
 
+**[Documentation](https://shrub24.github.io/Pi-Bolt.nix/)** · [Installation](https://shrub24.github.io/Pi-Bolt.nix/getting-started/)
+· [Examples](examples/README.md)
+
 ## Try it
 
 ```sh
@@ -25,8 +28,8 @@ This compiles the example `/words` command into Pi-Bolt. The first build compile
 
 ## Documentation
 
-Published at **<https://shrub24.github.io/Pi-Bolt.nix/>**, built from the Markdown in [`docs/`](docs/index.md) (readable on GitHub too).
-The site describes `main`; for a pinned revision, read `docs/` at that commit.
+The [published site](https://shrub24.github.io/Pi-Bolt.nix/) describes `main`. Its Markdown sources in [`docs/`](docs/index.md)
+are readable on GitHub; for a pinned revision, read them at that commit.
 
 - [Getting started](docs/getting-started.md): installation, a first plugin and updates.
 - [Documentation index](docs/index.md): guides, interface reference and architecture.

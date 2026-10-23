@@ -46,6 +46,10 @@ small transform removes the source H1 (Starlight supplies it from frontmatter) a
 Keep both the source files and rendered site readable. The custom `404.md` entry is marked draft to avoid a duplicate
 catch-all route; Starlight's dedicated error route still renders it.
 
-Hosting is separate from this build. No deployment workflow or repository Pages setting is enabled by this change.
+## Publishing
+
+The [Docs workflow](https://github.com/Shrub24/Pi-Bolt.nix/blob/main/.github/workflows/docs.yml) builds and publishes
+[the site](https://shrub24.github.io/Pi-Bolt.nix/) to GitHub Pages on documentation-related pushes to `main`, or by manual
+dispatch. Repository Pages uses GitHub Actions as its source. Pull requests are validated by CI but are not deployed.
 
 Before changing prose, examples, interfaces or site configuration, follow the [documentation policy](documentation.md).
