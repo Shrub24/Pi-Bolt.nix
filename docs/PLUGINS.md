@@ -45,42 +45,53 @@ Dependencies matter only where the compile happens. A plugin loaded at run time 
 
 A compiled plugin's npm imports must be staged at build. There are two ways, and they can be mixed per plugin.
 
-**One lock for the set (`pluginLock`).** One npm lock covers every compiled plugin. It is a standalone npm project with each
-plugin as a workspace: a package two plugins share is one copy, and one that needs another version than a sibling gets it
-nested under that plugin. The plugins keep a plain `package.json` and need no `nodeModules`.
+**One lock for the set (`pluginLock`).** One npm lock covers every compiled plugin: a standalone npm project with each plugin as
+a workspace, so a package two plugins share is one copy, and one that needs another version than a sibling gets it nested under
+that plugin. The plugins keep a plain `package.json` and need no `nodeModules`.
 
-The tree it installs is `plugins/node_modules`, which a compiled plugin resolves before Pi's own `node_modules`: a package the
-lock pins is the version the plugin gets, even where Pi carries another, and Pi's own packages stay visible to plugins that do
-not pin them. Pi is not part of the lock, so bumping this flake does not invalidate it: regenerate it when the plugin set
-changes, not when the release does.
+The tree it installs is `plugins/node_modules`, which a compiled plugin resolves before Pi's own. Pi is not part of the lock, so a
+Pi-Bolt bump does not invalidate it: regenerate it when the plugin set changes, not when the release does.
 
 ```nix
 (pkgs.pi-bolt.withPlugins (_: [ pluginA pluginB ])).override { pluginLock = ./plugins.lock.json; }
 ```
 
-Generate the lock where you update the plugins, never at build. Give each plugin by its `pluginName` and its `package.json`, a
-folder holding one, or its npm tarball:
+What the lock has to contain:
+
+- One workspace member per compiled plugin, at `pbplugins/<pluginName>`, recording that plugin's `name`, `version`,
+  `dependencies` and `optionalDependencies`. `name` is the package's own name, which is what another plugin imports it by, and
+  need not equal `pluginName`.
+- A `package.json` at the root of each plugin, from which those four fields are read.
+
+That is the whole constraint: the file is npm's format, so any tool that writes a compatible lock will do, and each plugin's
+manifest can be checked in, written by an update script, or extracted from a tarball by it.
+
+`update-plugin-lock` writes one, from the plugin manifests and nothing else:
 
 ```sh
 $(nix build --no-link --print-out-paths .#pi-bolt.updatePluginLock)/bin/update-plugin-lock plugins.lock.json \
-  word-count=./word-count/package.json pi-radar=./pi-radar-0.5.1.tgz
+  word-count=./word-count/package.json pi-radar=./pi-radar/package.json
 ```
 
-It asks the registry to resolve the declared ranges, so it needs network, and the result is committed. A plugin's
-`devDependencies` and scripts are not installed; `optionalDependencies` are, for the platforms that match. Peer dependencies are
-not installed, as when Pi installs a package itself (it passes `--legacy-peer-deps`, so that npm does not install a second Pi or
-an old one for a package that peers on it): declare what a plugin imports in its `dependencies`. List every plugin that has
-dependencies; a plugin left out of the lock is not installed, and the build says what it lacks (below).
+Give each plugin by its `pluginName` and its `package.json`, at update time rather than from a built derivation, so that moving
+the pins and regenerating the lock happen in one run. It asks the registry to resolve the declared ranges, so it needs network,
+and the result is committed. A plugin's `devDependencies` and scripts are not installed; `optionalDependencies` are, for the
+platforms that match. Peer dependencies are not installed, as when Pi installs a package itself (it passes `--legacy-peer-deps`,
+so that npm does not install a second Pi or an old one for a package that peers on it): declare what a plugin imports in its
+`dependencies`.
 
-Two things fail the build early:
+To keep the lock current, one expression per plugin that owns its pin and writes the plugin's `package.json` from the same value,
+an update script that moves both and regenerates the lock in one run, and the lock committed beside them. That is where
+`nix-update` fits, as an invocation from your script; this package ships no update script for the lock, because the member list
+belongs to the plugin set.
 
-- A lock that lists a plugin this package does not compile is refused at evaluation (`pluginLock has …, which this package does
-  not compile`): the lock was written for another plugin set. Regenerate it.
-- At the start of the compile, each plugin's declared `dependencies` are compared with what is staged for it, in the order the
-  plugin resolves them: its own `node_modules`, then the lock's tree, then Pi's. A dependency that is missing, or staged at a
-  version outside the declared range, fails the build and names the plugin, the package, the range and the version. Packages Pi
-  provides (`@earendil-works/pi-*` and `typebox`) are not checked: Pi routes a plugin's imports of them to its own copy, whatever
-  range the plugin declares, so declare them as `peerDependencies`.
+What a wrong lock looks like:
+
+- `pluginLock has …, which this package does not compile`: the lock was written for a different set. Regenerate it.
+- `npm error Invalid: lock file's … does not satisfy …`: a declared range the lock cannot satisfy. Regenerate it.
+- `a plugin's dependencies are not what it declares`, naming the plugin, package, range and version, before the compile: what is
+  staged for that plugin is missing or outside its range. Packages Pi provides (`@earendil-works/pi-*` and `typebox`) are never
+  checked, because Pi routes those imports to its own copy: declare them as `peerDependencies`.
 
 The checks cover `dependencies`, not imports a plugin never declared: one that works because another plugin or Pi provides the
 package is the plugin's defect.
