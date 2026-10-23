@@ -2,16 +2,16 @@
 # signed SHA256SUMS gives it. scripts/update-runtime.sh is the only writer; nix/runtime.nix builds from it, and flake.nix takes
 # its platform list from it.
 {
-  version = "0.9.6";
-  stamp = "de71ae35e809f880";
+  version = "0.9.9";
+  stamp = "a497d4c619f26017";
   assets = {
     x86_64-linux = {
       name = "pi-bolt-runtime-linux-x64.tar.gz";
-      hash = "sha256-YHf9723rOJRdbWelgDTkkW5u45aRQC9V+kvOM1cL4g4=";
+      hash = "sha256-lgAENmcDAtyimVj4oTqx4xXgr82OskIPIskbPWWM/50=";
     };
     aarch64-linux = {
       name = "pi-bolt-runtime-linux-arm64.tar.gz";
-      hash = "sha256-2FKu/l6VD4LGYy29Ia/2W7fC0Afi4QEqpYjid19CO/s=";
+      hash = "sha256-W8k3HkBZV/ij3LHA9KJIQiOEFsq7jGOfFmjXZXElFDI=";
     };
   };
 }
