@@ -1,0 +1,8 @@
+{
+  "name": "pi-bolt-greeting",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": { "yaml": "1.10.2" },
+  "peerDependencies": { "@earendil-works/pi-coding-agent": "*" },
+  "pi": { "extensions": ["index.ts"] }
+}

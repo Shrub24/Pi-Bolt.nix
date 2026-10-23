@@ -49,9 +49,12 @@
         pi-bolt-jit = pkgs.pi-bolt.override { jit = true; };
         # The release's runtime: one version drives two platform hashes and the stamp (scripts/update-runtime.sh).
         inherit (pkgs) pi-bolt-runtime;
+        docs = pkgs.callPackage ./nix/docs.nix { };
       });
 
       checks = forAllSystems (pkgs: {
+        docs = pkgs.callPackage ./nix/docs.nix { };
+        docs-examples = pkgs.callPackage ./nix/tests/docs-examples.nix { };
         # The plugin contract: compiled in, and loaded from the store.
         plugins = pkgs.callPackage ./nix/tests { };
         # The launcher generator: env, PATH and argv, and that the launcher still finds pi when moved.
