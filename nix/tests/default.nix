@@ -7,21 +7,13 @@
   lib,
   runCommand,
   writeShellScriptBin,
-  importNpmLock,
   makeBinaryWrapper,
-  nodejs,
   pi-bolt,
   piBoltPlugins,
 }:
 let
   inherit (piBoltPlugins) buildPiBoltPlugin;
   tool = writeShellScriptBin "pi-bolt-check-tool" "printf 'tool' ";
-  nodeModules = importNpmLock.buildNodeModules {
-    npmRoot = ./consumer;
-    inherit nodejs;
-    derivationArgs.npmRebuildFlags = [ "--ignore-scripts" ];
-  };
-
   helper = buildPiBoltPlugin {
     pname = "pi-bolt-check-helper";
     src = ./helper;
@@ -38,7 +30,7 @@ let
     dependencies = [ helper ];
     # Distinct names that used to produce the same JavaScript import binding.
     pluginName = "check_helper";
-    nodeModules = "${nodeModules}/node_modules";
+    packageLock = ./consumer/package-lock.json;
     postPatch = ''
       substituteInPlace index.ts \
         --replace-fail 'new URL("./data.txt", import.meta.url)' "\"$out/data.txt\""
@@ -137,6 +129,17 @@ assert (builtins.tryEval built.unwrapped.drvPath).success;
 # A lock listing a plugin this package does not compile is refused, naming it.
 assert
   !(builtins.tryEval (built.override { pluginLock = unknownPluginLock; }).unwrapped.drvPath).success;
+# A plugin's own lock and a ready node_modules folder are two ways to say one thing: both is refused.
+assert
+  !(builtins.tryEval
+    (buildPiBoltPlugin {
+      pname = "pi-bolt-check-both";
+      src = ./helper;
+      entry = "index.ts";
+      packageLock = ./consumer/package-lock.json;
+      nodeModules = "/nonexistent";
+    }).drvPath
+  ).success;
 # A plugin given no version still has a name (its default is "0").
 assert
   (buildPiBoltPlugin {

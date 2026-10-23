@@ -5,7 +5,8 @@ title: Plugin lock contract
 # Plugin lock contract
 
 `pluginLock` accepts a path to JSON or a parsed npm lock attribute set. It describes a standalone npm workspace project for
-plugin dependencies, not Pi's workspace. `null` leaves dependency preparation to the plugins' own `nodeModules`.
+plugin dependencies, not Pi's workspace. `null` leaves dependency preparation to each plugin's
+[`packageLock` or `nodeModules`](plugin-builder.md#arguments).
 
 ## File shape
 

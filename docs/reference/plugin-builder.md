@@ -5,7 +5,8 @@ title: Plugin builder
 # Plugin builder
 
 `pkgs.piBoltPlugins.buildPiBoltPlugin { ... }` returns a derivation containing the extension's source tree.
-See [packaging plugins](../guides/plugins.md) for recipes.
+See [packaging plugins](../guides/plugins.md) for recipes. The implementation is
+[`nix/plugins/build-plugin.nix`](https://github.com/Shrub24/Pi-Bolt.nix/blob/main/nix/plugins/build-plugin.nix).
 
 ## Arguments
 
@@ -18,7 +19,8 @@ See [packaging plugins](../guides/plugins.md) for recipes.
 | `pluginName` | `pname` | Staging directory/extension ID, used as `builtin:<pluginName>`. |
 | `packageName` | `null` | npm import name for links from dependent plugins. Not checked against the manifest. |
 | `dependencies` | `[ ]` | Other plugin derivations imported by this plugin. Their sources are staged transitively; registration remains explicit. |
-| `nodeModules` | `null` | Prepared `node_modules` directory copied into the plugin. |
+| `packageLock` | `null` | Path to the plugin's npm lock, with its matching `package.json` beside it. Installs private dependencies offline. |
+| `nodeModules` | `null` | Prepared `node_modules` directory, for custom installation. Mutually exclusive with `packageLock`. |
 | `runtimeInputs` | `[ ]` | Programs needed at runtime. Declared plugin dependencies' tools are included. |
 | `workers` | `[ ]` | Worker entry files relative to the plugin root; passed to Pi-Bolt as separate compile entries. |
 | `builtin` | `true` | Register as a named, replaceable built-in. `false` opts out of that mechanism and cannot be disabled by a selection. |
@@ -27,7 +29,10 @@ Standard derivation fields such as `patches`, `postPatch`, `meta`, `nativeBuildI
 preserves caller inputs/passthru and defaults `dontConfigure`, `dontBuild` and `dontFixup` to `true`; callers can override them.
 A build step is not run unless enabled explicitly.
 
-A supplied `nodeModules` tree is copied; declared plugin dependencies with a non-null `packageName` are linked into it.
+`packageLock` and its adjacent manifest must be readable at evaluation time. Installation omits dev dependencies, disables
+lifecycle scripts and does not auto-install peers. `packageLock` and `nodeModules` cannot both be set.
+
+The installed or supplied modules are copied; declared plugin dependencies with a non-null `packageName` are linked into them.
 Root copies of `@earendil-works/pi-*` and `typebox` are removed because Pi supplies them. The compile staging also excludes these
 names; see [host-package aliases](../architecture/build-and-resolution.md#host-package-aliases).
 

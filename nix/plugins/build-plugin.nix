@@ -6,6 +6,8 @@
 {
   lib,
   stdenvNoCC,
+  nodejs,
+  importNpmLock,
 }:
 lib.extendMkDerivation {
   constructDrv = stdenvNoCC.mkDerivation;
@@ -15,6 +17,7 @@ lib.extendMkDerivation {
     "pluginName"
     "packageName"
     "dependencies"
+    "packageLock"
     "nodeModules"
     "workers"
     "builtin"
@@ -34,8 +37,10 @@ lib.extendMkDerivation {
       packageName ? null,
       # Other plugins (buildPiBoltPlugin) this one imports. Compiled in, each is staged once and shared, registered or not.
       dependencies ? [ ],
-      # A ready node_modules folder for the npm packages the plugin imports, as
-      # importNpmLock.buildNodeModules makes it: "${deps}/node_modules".
+      # The plugin's own package-lock.json, a path in the consumer's repository with the plugin's package.json beside it: the
+      # package installs it, offline, into a node_modules of the plugin's own. The set-wide alternative is pi-bolt's pluginLock.
+      packageLock ? null,
+      # Or a ready node_modules folder, for a tree made some other way: "${deps}/node_modules".
       nodeModules ? null,
       # External programs this plugin needs at run time; dependencies' programs are included too.
       runtimeInputs ? [ ],
@@ -48,6 +53,27 @@ lib.extendMkDerivation {
       ...
     }:
     let
+      ownModules =
+        assert lib.assertMsg (
+          packageLock == null || nodeModules == null
+        ) "buildPiBoltPlugin ${finalAttrs.pname}: give packageLock or nodeModules, not both";
+        if packageLock != null then
+          "${
+            importNpmLock.buildNodeModules {
+              npmRoot = builtins.dirOf packageLock;
+              packageLock = lib.importJSON packageLock;
+              inherit nodejs;
+              derivationArgs = {
+                npmFlags = [
+                  "--legacy-peer-deps"
+                  "--omit=dev"
+                ];
+                npmRebuildFlags = [ "--ignore-scripts" ];
+              };
+            }
+          }/node_modules"
+        else
+          nodeModules;
       depInfo =
         dep:
         dep.piBolt
@@ -78,9 +104,9 @@ lib.extendMkDerivation {
         mkdir -p $out
         cp -r . $out/
         chmod -R u+w $out
-        ${lib.optionalString (nodeModules != null) ''
+        ${lib.optionalString (ownModules != null) ''
           mkdir -p $out/node_modules
-          cp -rL --no-preserve=mode ${nodeModules}/. $out/node_modules/
+          cp -rL --no-preserve=mode ${ownModules}/. $out/node_modules/
         ''}
         ${lib.concatMapStrings linkDependency dependencies}
         # Pi provides its packages: a copy here would be a second Pi.

@@ -39,8 +39,8 @@ src = pkgs.fetchurl {
 entry = "extensions/loop-police.ts";
 ```
 
-The hash is illustrative: obtain the actual archive hash before using this recipe. The builder unpacks the archive; it does not
-fetch npm dependencies automatically. Supply them using a [plugin lock or `nodeModules`](dependencies.md).
+The hash is illustrative: obtain the actual archive hash before using this recipe. The builder unpacks the archive. Supply npm
+dependencies using a [shared `pluginLock` or per-plugin `packageLock`](dependencies.md).
 
 ## Patch the source
 
@@ -78,7 +78,7 @@ Apply this overlay after `pi-bolt-nix.overlays.default`. No catalogue membership
 
 Use a plugin in `payload.select { plugins = [ runtimePlugin ]; }` when it is not in the payload's compiled set. Pi loads it as
 an ordinary store package. Its npm dependencies must still be available to Pi; a compile-time `pluginLock` does not install a
-runtime plugin's dependencies. A prepared `nodeModules` tree can accompany the plugin.
+runtime plugin's dependencies. Use `packageLock` on the plugin, or supply a prepared `nodeModules` tree.
 
 For a temporary invocation, `pi -e <entry-file>` loads the extension directly; `plugin.extensionPath` gives its store entry.
 Do not prepend `-e` to a command that must dispatch subcommands: `pi-bolt -e <path> doctor` treats `doctor` as a prompt.
