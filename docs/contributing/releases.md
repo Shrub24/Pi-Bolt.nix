@@ -11,7 +11,7 @@ From the repository root:
 1. Update the runtime data, specifying the intended release:
 
    ```sh
-   nix run .#update-runtime -- 1.0.1
+   nix run .#update-runtime -- 1.0.3
    ```
 
    Without a version the updater selects the newest stable release. It verifies the signature on `SHA256SUMS` against

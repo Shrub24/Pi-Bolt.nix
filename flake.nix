@@ -5,7 +5,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     # The release: its VERSION must match the runtime (nix/runtime.nix), and it is the default source.
     pi-bolt = {
-      url = "github:opensec-git/Pi-Bolt/bolt-v1.0.1";
+      url = "github:opensec-git/Pi-Bolt/bolt-v1.0.3";
       flake = false;
     };
     # What gets compiled: the release by default. Downstream, follow your own input, which may be a fork branch:
