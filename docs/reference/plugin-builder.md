@@ -47,3 +47,18 @@ names; see [host-package aliases](../architecture/build-and-resolution.md#host-p
 
 `piBolt` is generated metadata, not an alternative authoring API. Normal Pi manifests remain stock-Pi-compatible; do not add
 Pi-Bolt-specific fields to `package.json` for this builder.
+
+## Fetched npm packages
+
+`pkgs.piBoltPlugins.fetchNpmPackage { pname, version, hash, registry ? "https://registry.npmjs.org"; }` fetches one package from
+the npm registry and unpacks it, for a plugin published to npm. `hash` is the registry's own integrity value
+(`npm view <pname>@<version> dist.integrity`) or any SRI hash of the tarball; `registry` selects a mirror.
+
+The result is the package directory, so its `package.json` is at the derivation root and a plugin's `entry` is relative to that
+root. `passthru.packageName` carries the npm name, which the builder uses when linking it as a dependency.
+
+Both builders sit in the scope because a published plugin set reads them from it:
+
+```nix
+inherit (pkgs.piBoltPlugins) buildPiBoltPlugin fetchNpmPackage;
+```

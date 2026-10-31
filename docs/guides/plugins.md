@@ -6,6 +6,24 @@ title: Packaging plugins
 
 `withPlugins` accepts plugins from `pkgs.piBoltPlugins` or derivations built elsewhere with `buildPiBoltPlugin`.
 
+## Consume a plugin that ships its own package
+
+The payload reads only `plugin.piBolt` from a plugin derivation, so a plugin repository can build itself and export the result as
+its own flake package. That is the shape to prefer when it exists: the plugin's repository owns its source, version, patches and
+npm dependencies, and its update step moves them together.
+
+```nix
+plugins = [ inputs.pi-greeting.packages.${system}.default ];
+```
+
+Pass it to the payload without going through the scope:
+
+```nix
+pkgs.pi-bolt.withPlugins (_: [ inputs.pi-greeting.packages.${system}.default ])
+```
+
+The rest of this page is for a plugin that ships no Nix package: you supply the recipe.
+
 ## Package a local extension
 
 ```nix
@@ -41,6 +59,22 @@ entry = "extensions/loop-police.ts";
 
 The hash is illustrative: obtain the actual archive hash before using this recipe. The builder unpacks the archive. Supply npm
 dependencies using a [shared `pluginLock` or per-plugin `packageLock`](dependencies.md).
+
+### Published to npm
+
+The scope's fetcher takes the registry URL and naming for you:
+
+```nix
+src = pkgs.piBoltPlugins.fetchNpmPackage {
+  pname = "pi-loop-police";
+  version = "1.14.1";
+  hash = "sha512-...";
+};
+entry = "extensions/loop-police.ts";
+```
+
+`hash` is the package's `dist.integrity` from the registry (`npm view pi-loop-police@1.14.1 dist.integrity`). The fetched tree is
+the package itself, so `entry` paths match the published package; see the [reference](../reference/plugin-builder.md#fetched-npm-packages).
 
 ## Patch the source
 

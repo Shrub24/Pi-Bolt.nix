@@ -16,6 +16,11 @@
 }:
 lib.makeScope newScope (self: {
   buildPiBoltPlugin = self.callPackage ./build-plugin.nix { };
+  # One package from the npm registry, unpacked: a plugin published to npm, or a
+  # library a plugin imports. A producer set reads both builders from the scope, so
+  # a recipe written against the application's scope has this one here too, as far
+  # as the two builders' arguments agree.
+  fetchNpmPackage = self.callPackage ./fetch-npm-package.nix { };
 
   # Pi-Bolt's examples/plugins: the /words command (docs/PLUGINS.md).
   word-count = self.buildPiBoltPlugin {
