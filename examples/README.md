@@ -10,6 +10,18 @@ into the consuming configuration, preserving its relative paths.
 
 Both use `pi-bolt-nix.overlays.default` on the package set passed to them.
 
+## See a real configuration
+
+These two examples are self-contained. Larger working setups live in the repositories that build what they package:
+
+- [`pi-extensions`](https://github.com/Shrub24/pi-extensions) — one Nix package per plugin, dependencies and patches included.
+  Take them by package name; see [packaging plugins](../docs/guides/plugins.md#consume-a-plugin-that-ships-its-own-package).
+- [`nix-dotfiles` `pkgs/pi-plugins`](https://github.com/Shrub24/nix-dotfiles/tree/main/pkgs/pi-plugins) — a packaging catalogue
+  with a committed plugin lock and an update script, as described in [npm dependencies](../docs/guides/dependencies.md#recommended-shape).
+  Its [`pkgs/pi-bolt`](https://github.com/Shrub24/nix-dotfiles/tree/main/pkgs/pi-bolt) shows role launchers over one payload.
+
+Both are consumer configurations, not required layouts; the guides state the contracts they satisfy.
+
 ## Home Manager
 
 Import `./home-manager` as a Home Manager module. It selects the built-in example plugin and renders settings using `select`.

@@ -13,14 +13,19 @@ its own flake package. That is the shape to prefer when it exists: the plugin's 
 npm dependencies, and its update step moves them together.
 
 ```nix
-plugins = [ inputs.pi-greeting.packages.${system}.default ];
+let
+  # pi-extensions is a flake input of the consuming configuration.
+  plugins = pi-extensions.packages.${pkgs.stdenv.hostPlatform.system};
+in
+pkgs.pi-bolt.withPlugins (_: [ plugins.herdsman plugins.tool-renderer ])
 ```
 
-Pass it to the payload without going through the scope:
+Both forms set the compiled selection; it replaces the payload's own plugins rather than extending them. `withPlugins` takes
+the selector so a scope can be read per plugin, and `pkgs.pi-bolt.override { plugins = [ plugins.herdsman ]; }` sets the same
+list directly.
 
-```nix
-pkgs.pi-bolt.withPlugins (_: [ inputs.pi-greeting.packages.${system}.default ])
-```
+[`pi-extensions`](https://github.com/Shrub24/pi-extensions) is a working example: one package per plugin, each built in its own
+repository, so its source pins, patches and npm dependencies move there rather than in the consumer's tree.
 
 The rest of this page is for a plugin that ships no Nix package: you supply the recipe.
 

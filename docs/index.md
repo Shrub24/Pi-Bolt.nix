@@ -18,13 +18,16 @@ nix run github:Shrub24/Pi-Bolt.nix -- --version
 ```
 
 [Getting started](getting-started.md) has complete NixOS and standalone Home Manager configurations, guidance for Home Manager
-inside NixOS, and a first compiled plugin. Nix owns this installation; updates go through the consuming flake.
+inside NixOS, a first compiled plugin, and the assembled setup this project recommends. Nix owns this installation; updates go
+through the consuming flake.
 
 ## Adapt an example
 
 - [Home Manager](https://github.com/Shrub24/Pi-Bolt.nix/tree/main/examples/home-manager): a compiled plugin and its generated settings.
 - [Custom plugin set](https://github.com/Shrub24/Pi-Bolt.nix/tree/main/examples/plugin-set): a local extension, shared npm lock,
   settings and a named launcher.
+- [Real configurations](https://github.com/Shrub24/Pi-Bolt.nix/blob/main/examples/README.md#see-a-real-configuration):
+  [`pi-extensions`](https://github.com/Shrub24/pi-extensions) packages plugins; `nix-dotfiles` shows roles and an update script.
 
 The [example instructions](https://github.com/Shrub24/Pi-Bolt.nix/blob/main/examples/README.md) explain how to integrate each one.
 

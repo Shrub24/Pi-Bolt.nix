@@ -67,9 +67,13 @@ Do not add a second file manager for a file Home Manager already owns.
 Place Pi-Bolt-specific package entries in its overlay when stock Pi reads the same settings:
 
 ```nix
-piBolt = {
-  packagesOverlay = true;
-  packages = (payload.select { }).settings.packages;
+programs.pi-coding-agent.settings = {
+  # Ordinary entries, as stock Pi writes them.
+  packages = [ "npm:some-shared-package" ];
+  piBolt = {
+    packagesOverlay = true;
+    packages = (payload.select { }).settings.packages;
+  };
 };
 ```
 

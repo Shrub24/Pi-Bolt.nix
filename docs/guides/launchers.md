@@ -24,8 +24,9 @@ to change the default entrypoint's environment.
 The consumer creates the role directory, writes its settings and decides whether credentials and sessions are shared. A launcher
 only points to it; it does not mirror another directory or create files.
 
-Use `payload.select { ... }` to obtain the role's settings and `runtimeInputs`, then add the latter to the launcher's `path`.
-The [plugin-set example](https://github.com/Shrub24/Pi-Bolt.nix/tree/main/examples/plugin-set) demonstrates this combination.
+Use `payload.select { ... }` to obtain the role's settings and `runtimeInputs`, then add the latter to the launcher's `path`. The
+value lists only what the launcher does not already carry: the tools of plugins the payload does not compile. The
+[plugin-set example](https://github.com/Shrub24/Pi-Bolt.nix/tree/main/examples/plugin-set) demonstrates this combination.
 
 - Environment values are literal. Use absolute paths; `$HOME` is not expanded.
 - Added `path` entries do not remove the package's tools or its compiled plugins' tools.

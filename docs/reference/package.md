@@ -21,6 +21,9 @@ Available on `x86_64-linux` and `aarch64-linux`:
 
 No `nixosModules` or `homeManagerModules` output is supplied. See [installation](../getting-started.md).
 
+A **payload** below means a `pkgs.pi-bolt` value: the plain package, one of its `override` results, or a `withPlugins` result.
+Helpers that take a selection are attributes of that value.
+
 ## Package overrides
 
 Use `pkgs.pi-bolt.override { ... }`. These consumer arguments are distinct from injected build dependencies:

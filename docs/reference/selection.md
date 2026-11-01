@@ -41,8 +41,10 @@ In open mode, omitted named compiled plugins get `-builtin:<name>`. In closed mo
 `!extensions/**`; selected named compiled plugins and `enable` IDs get `+builtin:<name>`. Explicit paths are appended and can
 load even under closed mode. `settings.extensions` is omitted when there are no rules or explicit entries.
 
-`runtimeInputs` combines the package's own tools with tools of the selected plugin derivations, including their declared plugin
-dependencies. Raw npm/git/filter entries supply no tool metadata. This value does not change the payload's tool list.
+`runtimeInputs` lists the tools a launcher still lacks. Every launcher this package installs already prepends the package's own
+tools and those of its compiled plugins, so this value holds the tools of selected plugins the payload does not compile. Raw
+npm/git/filter entries supply no tool metadata. A selection of exactly the compiled plugins therefore returns `[ ]`, and the
+value never changes the payload's own tool list.
 
 ## Constraints and limits
 

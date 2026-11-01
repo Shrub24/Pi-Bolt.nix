@@ -146,6 +146,44 @@ for the selected plugins. The [custom plugin-set example](https://github.com/Shr
 adds a local extension, npm dependencies and a launcher; see the [example instructions](https://github.com/Shrub24/Pi-Bolt.nix/blob/main/examples/README.md).
 For other extensions, continue with [packaging plugins](guides/plugins.md).
 
+## Assemble a fuller setup
+
+The examples above stay minimal. In a Home Manager module, a configuration that compiles several plugins, renders settings for
+them and adds a second entrypoint adds three bindings to it:
+
+```nix
+let
+  payload = pkgs.pi-bolt.withPlugins (_: [
+    pi-extensions.packages.${pkgs.stdenv.hostPlatform.system}.herdsman
+    pi-extensions.packages.${pkgs.stdenv.hostPlatform.system}.tool-renderer
+  ]);
+  selection = payload.select { };
+in
+{
+  programs.pi-coding-agent = {
+    enable = true;
+    package = payload.override {
+      launchers.pi-bolt-child = {
+        env.PI_CODING_AGENT_DIR = "/home/me/.pi/roles/child";
+        path = selection.runtimeInputs;
+      };
+    };
+    settings = selection.settings;
+  };
+}
+```
+
+`pi-extensions` there is a flake input whose packages are built with `buildPiBoltPlugin`. Each of its packages is named for the
+plugin it contains ([packaging plugins](guides/plugins.md#consume-a-plugin-that-ships-its-own-package)).
+
+- Point a plugin repository's `pi-bolt-nix` input at the same Pi-Bolt.nix input used here, so its packages and the payload
+  share one builder and one release.
+- A plugin packaged in its own repository needs no lock in this configuration; see [npm dependencies](guides/dependencies.md).
+- Update the payload and its plugins with `nix flake update pi-bolt-nix pi-extensions`.
+
+[Settings](guides/settings.md), [launchers](guides/launchers.md) and the [package reference](reference/package.md) cover each
+part in full.
+
 ## Update
 
 ```sh

@@ -7,6 +7,9 @@ title: npm dependencies
 A compiled plugin's npm dependencies must be available at build time. Use `pluginLock` for a shared set or `packageLock` for
 a plugin's own lock. The two methods can be mixed.
 
+Nothing here applies when a plugin comes from a package its own repository builds: that package already contains its
+dependencies. `pluginLock` is for plugins packaged in the consuming tree, or for one repository that packages a whole set.
+
 | Need | Choose |
 | --- | --- |
 | Share compatible dependencies across a compiled plugin set | `pluginLock` on the payload. |
@@ -38,22 +41,22 @@ file contract and errors.
 
 ## Keep manifests and pins together
 
-Pass manifests available **during the update**, not paths frozen from plugin derivations when an updater was evaluated.
-Otherwise a script can move a pin while regenerating the lock from the old manifest.
+The lock is only correct for the manifests it was generated from. Resolve those manifests **during the update**, not from paths
+frozen when an updater was evaluated: a script that does the latter can move a pin while regenerating the lock from the old
+manifest.
 
-### Recommended shape (optional)
+### Recommended shape
 
-One update script moves the pins, obtains each plugin's `package.json` in the same run, then calls `update-plugin-lock` once
-with those manifests. Commit the pins, manifests and lock together, so they cannot disagree.
+One update step moves each plugin's pin, obtains that plugin's `package.json` in the same run, then calls `update-plugin-lock`
+once with all the manifests. Commit the pins and the lock together, so they cannot disagree. Expose it as a
+`passthru.updateScript` on the package that owns the plugin set; `nix-update --use-update-script` then drives it.
 
-For a larger packaging example, see the author's [`pkgs/pi-plugins`](https://github.com/Shrub24/nix-dotfiles/tree/main/pkgs/pi-plugins)
-catalogue: source recipes, a committed lock and a consumer-owned `passthru.updateScript`. Its public version exposes
-`updateScript` and `updateLock` separately; it is not a ready-made implementation of the combined update above.
+[`pkgs/pi-plugins`](https://github.com/Shrub24/nix-dotfiles/tree/main/pkgs/pi-plugins) in the author's `nix-dotfiles` is a
+working instance: source recipes, a committed `plugins.lock.json`, and an update script that runs `update-plugin-lock`.
 
-The sample is one way to organise it, not a requirement. Manifests may be checked in, generated or extracted from archives,
-and any tool that produces a compatible npm lock is acceptable. A `passthru.updateScript` like the sample's lets
-`nix-update --use-update-script` drive it. This package ships no `updateScript` for the lock, because the member list belongs to
-the consumer's plugin set.
+This package ships no `updateScript` of its own, because the member list belongs to the consumer's plugin set. Any tool that
+writes a compatible npm lock is acceptable; manifests may be checked in, generated, or extracted from an archive during the
+update.
 
 For the local [example plugin](https://github.com/Shrub24/Pi-Bolt.nix/tree/main/examples/plugin-set), the update command from the
 repository root is:
