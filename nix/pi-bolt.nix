@@ -340,10 +340,17 @@ stdenvNoCC.mkDerivation (
 
     # One call for one selection: the settings keys and the tools the same selection needs. Defaults to the compiled set.
     settingsFor = callPackage ./settings.nix { };
-    select = args: {
-      settings = settingsFor.render ({ compiled = finalAttrs.plugins; } // args);
-      runtimeInputs = runtimeInputsFor (args.plugins or finalAttrs.plugins);
-    };
+    select =
+      args:
+      let
+        selected = args.plugins or finalAttrs.plugins;
+      in
+      {
+        settings = settingsFor.render ({ compiled = finalAttrs.plugins; } // args);
+        # The tools a launcher still lacks: its installed launchers already prepend `toolInputs` (see installPhase), so this is
+        # the selected plugins' tools that the payload does not compile in.
+        runtimeInputs = lib.subtractLists toolInputs (runtimeInputsFor selected);
+      };
 
     mkLauncher = callPackage ./launcher.nix { };
     installedLaunchers = lib.mapAttrsToList (name: spec: {

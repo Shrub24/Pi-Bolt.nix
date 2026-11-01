@@ -119,6 +119,8 @@ assert lib.elem "/x/extra.ts"
   }).extensions or [ ];
 # A selection's tools reach the launcher's PATH with the package's own, and a raw entry adds none.
 assert lib.elem tool (pi-bolt.select { plugins = [ runtime ]; }).runtimeInputs;
+# A launcher already carries the payload's tools, so a selection of what it compiled adds nothing.
+assert (pi-bolt.select { }).runtimeInputs == [ ];
 assert
   (pi-bolt.select {
     plugins = [
