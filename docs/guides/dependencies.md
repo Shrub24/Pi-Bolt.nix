@@ -24,16 +24,19 @@ dependencies. `pluginLock` is for plugins packaged in the consuming tree, or for
 }
 ```
 
-Generate the lock from each plugin's `package.json`, using its `pluginName` as the argument name:
+Generate the lock from the plugins' `package.json` files:
 
 ```sh
-updater=$(nix build --no-link --print-out-paths .#pi-bolt.updatePluginLock)
-"$updater/bin/update-plugin-lock" plugins.lock.json \
-  plugin-a=./plugin-a/package.json plugin-b=./plugin-b/package.json
+nix run .#pi-bolt.updatePluginLock -- -o plugins.lock.json \
+  ./plugin-a/package.json ./plugin-b/package.json
 ```
 
-This command assumes the consuming flake exports its payload as `pi-bolt`. It needs network access to resolve npm ranges.
-Commit the resulting lock. Builds fetch integrity-pinned dependencies and install offline; they do not resolve new versions.
+Each plugin's folder in the lock is its name, taken from the manifest's folder. Prefix a manifest when they differ:
+`radar=./checkouts/borrowed/package.json`. The name is the plugin's `pluginName`, the same string the payload compiles it as.
+
+`.#pi-bolt` is whatever attribute your flake exposes the payload as. Paths are read from the current directory. The command
+needs network access to resolve npm ranges; the resulting lock is committed, and builds fetch its integrity-pinned
+dependencies and install offline without resolving new versions.
 
 The shared project contains the plugins, not Pi. Compatible dependencies share a copy; incompatible versions can nest under a
 plugin. Updating Pi-Bolt alone does not invalidate the lock. See the [lock reference](../reference/plugin-lock.md) for the exact
@@ -58,13 +61,11 @@ This package ships no `updateScript` of its own, because the member list belongs
 writes a compatible npm lock is acceptable; manifests may be checked in, generated, or extracted from an archive during the
 update.
 
-For the local [example plugin](https://github.com/Shrub24/Pi-Bolt.nix/tree/main/examples/plugin-set), the update command from the
-repository root is:
+For the local [example plugin](https://github.com/Shrub24/Pi-Bolt.nix/tree/main/examples/plugin-set), from the repository root:
 
 ```sh
-updater=$(nix build --no-link --print-out-paths .#pi-bolt.updatePluginLock)
-"$updater/bin/update-plugin-lock" examples/plugin-set/plugins.lock.json \
-  greeting=examples/plugin-set/greeting/package.json
+nix run .#pi-bolt.updatePluginLock -- -o examples/plugin-set/plugins.lock.json \
+  examples/plugin-set/greeting/package.json
 ```
 
 ## Use a plugin's own lock

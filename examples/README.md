@@ -55,9 +55,8 @@ or credential/session sharing policy is imposed.
 Regenerate its lock from the repository root:
 
 ```sh
-updater=$(nix build --no-link --print-out-paths .#pi-bolt.updatePluginLock)
-"$updater/bin/update-plugin-lock" examples/plugin-set/plugins.lock.json \
-  greeting=examples/plugin-set/greeting/package.json
+nix run .#pi-bolt.updatePluginLock -- -o examples/plugin-set/plugins.lock.json \
+  examples/plugin-set/greeting/package.json
 ```
 
 `checks.<system>.docs-examples` evaluates both examples without building their executables. The custom plugin's compiled

@@ -42,12 +42,13 @@ is required. See the [complete example](https://github.com/Shrub24/Pi-Bolt.nix/t
 `payload.updatePluginLock` provides:
 
 ```text
-update-plugin-lock OUT NAME=MANIFEST...
+update-plugin-lock -o OUT [NAME=]MANIFEST...
 ```
 
-- `OUT` is the destination lockfile; its parent directory must exist. An existing file is replaced.
-- `NAME` is the plugin's `pluginName`, used for its workspace folder. Give each name once.
+- `-o`, `--output` is the destination lockfile; its parent directory must exist. An existing file is replaced.
 - `MANIFEST` is a file containing a JSON object with string `name` and `version` fields. Folders and archives are not accepted.
+- `NAME` is the plugin's `pluginName`, used as its workspace folder. Without it the manifest's folder name is used. Give each
+  name once; a name cannot contain `/`.
 - At least one member is required. Resolve manifests at update time, not from old evaluation-time plugin store paths.
 
 It creates a temporary project, projects the four fields above, runs npm's lock-only resolver with
@@ -66,6 +67,7 @@ during evaluation.
 | `npm error Invalid: lock file's … does not satisfy …` | Source manifest and dependency lock disagree. Regenerate after updating manifests. |
 | `a plugin's dependencies are not what it declares` | A declared dependency is missing or out of range in the staged tree; the message names the plugin, range and version. Fix its lock or own modules. |
 | `is not a file (pass the plugin's package.json)` | A folder/archive was supplied rather than a manifest. |
+| `needs NAME=MANIFEST` | The manifest's folder does not name the plugin; prefix the manifest with its name. |
 | `is not a package.json with a name and a version` | Invalid manifest input. |
 
 Declared `dependencies` are checked before compilation, except Pi-provided packages and explicitly linked plugin dependencies.
