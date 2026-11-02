@@ -21,7 +21,7 @@ Plugin documentation is now split by task. Start with [getting started](getting-
 
 ## Compiling in
 
-[First compiled plugin](getting-started.md#compile-a-first-plugin) · [Package reference](reference/package.md)
+[First compiled plugin](getting-started.md#start-without-external-inputs) · [Package reference](reference/package.md)
 
 ## Settings for a selection
 

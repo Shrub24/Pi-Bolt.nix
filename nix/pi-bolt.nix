@@ -16,6 +16,7 @@ args@{
   rsync,
   autoPatchelfHook,
   writeText,
+  runCommand,
   nodejs,
   libxcb,
   ripgrep,
@@ -47,8 +48,10 @@ args@{
   # Fail when the source's engine stamp is not the runtime's. Set false to warn instead: the stamp also covers files that do not
   # affect this system (scripts/build-runtime.ps1), so a branch that edits only those could not be built otherwise.
   checkRuntimeStamp ? true,
+  # Programs for every entrypoint: added to `runtimeInputs`, so a launcher gets them without repeating the base list.
+  extraPackages ? [ ],
   # Programs Pi finds in PATH rather than downloading: rg and fd for its grep and find tools. Add wl-clipboard or xclip for
-  # the clipboard.
+  # the clipboard with `extraPackages`; this list is the base, and overriding it replaces the defaults.
   runtimeInputs ? [
     ripgrep
     fd
@@ -89,11 +92,15 @@ stdenvNoCC.mkDerivation (
         null
       else
         builtins.fromJSON (builtins.readFile pluginLock);
-    lockMembers = map (key: lib.removePrefix "pbplugins/" key) (
-      lib.filter (
-        key: lib.hasPrefix "pbplugins/" key && !lib.hasInfix "/" (lib.removePrefix "pbplugins/" key)
-      ) (lib.attrNames lock.packages)
-    );
+    lockMembers =
+      if lock == null then
+        [ ]
+      else
+        map (key: lib.removePrefix "pbplugins/" key) (
+          lib.filter (
+            key: lib.hasPrefix "pbplugins/" key && !lib.hasInfix "/" (lib.removePrefix "pbplugins/" key)
+          ) (lib.attrNames lock.packages)
+        );
     # A member this package does not compile names a plugin set the lock was not written for: nothing stages it, and npm would
     # refuse the tree.
     notCompiled = lib.filter (member: !(byName ? ${member})) lockMembers;
@@ -113,6 +120,37 @@ stdenvNoCC.mkDerivation (
           }) lockedPlugins;
           packageLock = lock;
         };
+
+    # The same plugins with the lock's tree within reach, for a settings file stock Pi reads: its loader resolves a local
+    # package's imports from where the files are, and a plugin's own store path has no node_modules (the lock's tree lives at
+    # the payload). Sources are copied under one root whose node_modules is that tree, so resolution walks out to it and a
+    # package two plugins share is still one copy: only sources are duplicated, 12 KB in the check's fixture.
+    runtimeSet =
+      if pluginSet == null then
+        null
+      else
+        runCommand "pi-bolt-runtime-set" { } (
+          ''
+            mkdir -p $out/pbplugins
+            ln -s ${pluginSet}/node_modules $out/node_modules
+          ''
+          + lib.concatMapStrings (plugin: ''
+            mkdir -p $out/pbplugins/${plugin.piBolt.name}
+            cp -r --no-preserve=mode ${plugin}/. $out/pbplugins/${plugin.piBolt.name}/
+            chmod -R u+w $out/pbplugins/${plugin.piBolt.name}
+            ${lib.optionalString (lib.elem plugin lockedPlugins) ''
+              if [ -d ${pluginSet}/pbplugins/${plugin.piBolt.name}/node_modules ]; then
+                ln -s ${pluginSet}/pbplugins/${plugin.piBolt.name}/node_modules \
+                  $out/pbplugins/${plugin.piBolt.name}/node_modules
+              fi
+            ''}
+          '') lockedPlugins
+        );
+    # Where a shared settings file should point a plugin: the view above when it exists, otherwise the plugin itself, which
+    # carries its own tree (packageLock, nodeModules).
+    runtimeSources = lib.mapAttrs' (name: _: lib.nameValuePair name "${runtimeSet}/pbplugins/${name}") (
+      lib.listToAttrs (map (plugin: lib.nameValuePair plugin.piBolt.name plugin) lockedPlugins)
+    );
 
     workspace = callPackage ./workspace.nix {
       src = sources.workspace;
@@ -327,11 +365,12 @@ stdenvNoCC.mkDerivation (
       };
     });
 
-    # The tools a selection of plugins needs, beside the package's own. A run-time plugin's tools come through here too.
+    # The tools a selection needs beside the package's own, and a run-time plugin's tools. A launcher's PATH starts from this.
     runtimeInputsFor =
       plugins:
       lib.unique (
         runtimeInputs
+        ++ extraPackages
         ++ lib.concatMap (plugin: plugin.piBolt.runtimeInputs) (
           lib.filter (plugin: plugin ? piBolt) plugins
         )
@@ -346,7 +385,13 @@ stdenvNoCC.mkDerivation (
         selected = args.plugins or finalAttrs.plugins;
       in
       {
-        settings = settingsFor.render ({ compiled = finalAttrs.plugins; } // args);
+        settings = settingsFor.render (
+          {
+            compiled = finalAttrs.plugins;
+            inherit runtimeSources;
+          }
+          // args
+        );
         # The tools a launcher still lacks: its installed launchers already prepend `toolInputs` (see installPhase), so this is
         # the selected plugins' tools that the payload does not compile in.
         runtimeInputs = lib.subtractLists toolInputs (runtimeInputsFor selected);

@@ -40,15 +40,37 @@ in
       closed ? false,
       enable ? [ ],
       extensions ? [ ],
+      # Render for a settings file stock Pi reads too: a compiled plugin's entry is left loadable, and the overlay below
+      # switches its extension off for Pi-Bolt only (see `entry` and `overlay`).
+      shared ? false,
+      # Where each plugin should be read from when it is shared: the payload's runtime view for plugins whose
+      # dependencies come from a pluginLock, since a plugin's own store path has none. Missing names fall back to the plugin.
+      runtimeSources ? { },
     }:
     let
       selected = unique (lib.filter isPlugin plugins);
       passed = lib.filter (entry: !isPlugin entry) plugins;
       selectedBuiltins = lib.filter (plugin: contains compiled plugin && plugin.piBolt.builtin) selected;
       leftOut = lib.filter (plugin: !contains selected plugin && plugin.piBolt.builtin) compiled;
+      # In a shared file, stock Pi loads the plugin from the store, which is the same source Pi-Bolt compiled. Pi-Bolt replaces
+      # that entry in place with one that keeps only its resources, by the identity both entries share: the store path. So no
+      # exclusion is needed and nothing is fetched again.
+      sharedPlugins = if shared then selectedBuiltins else [ ];
+      # A shared entry names the runtime view when there is one, so stock Pi resolves the plugin's dependencies; Pi-Bolt's
+      # overlay names the same source, which is what makes its replacement in-place.
+      sourceOf = plugin: runtimeSources.${plugin.piBolt.name} or "${plugin}";
       entry =
         plugin:
-        { source = "${plugin}"; } // lib.optionalAttrs (contains compiled plugin) { extensions = [ ]; };
+        {
+          source = sourceOf plugin;
+        }
+        // lib.optionalAttrs (contains compiled plugin && !contains sharedPlugins plugin) {
+          extensions = [ ];
+        };
+      overlay = map (plugin: {
+        source = sourceOf plugin;
+        extensions = [ ];
+      }) sharedPlugins;
       denied =
         if closed then
           [
@@ -67,6 +89,12 @@ in
     assert validate { inherit compiled selected; };
     {
       packages = map entry selected ++ passed;
+    }
+    // lib.optionalAttrs (overlay != [ ]) {
+      piBolt = {
+        packagesOverlay = true;
+        packages = overlay;
+      };
     }
     // lib.optionalAttrs (generated != [ ]) { extensions = generated; };
 }

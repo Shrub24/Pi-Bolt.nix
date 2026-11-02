@@ -10,6 +10,7 @@ payload.select {
   closed = false;
   enable = [ ];
   extensions = [ ];
+  shared = false;
 }
 ```
 
@@ -23,6 +24,7 @@ Returns `{ settings; runtimeInputs; }`. Both are values: no settings file is wri
 | `closed` | `false` | Emit deny patterns for built-ins and auto-discovered local extensions, then allow the selected built-ins and `enable`. |
 | `enable` | `[ ]` | Additional built-in IDs emitted as `+builtin:<id>`. Names are passed through unchecked. |
 | `extensions` | `[ ]` | Explicit paths/patterns appended after generated extension rules, unchecked. |
+| `shared` | `false` | Render for a settings file stock Pi reads too: a compiled plugin's store entry stays loadable, and a `piBolt` overlay replaces that source with a resources-only entry so only the compiled copy runs in Pi-Bolt. |
 
 ## Result
 
@@ -32,6 +34,7 @@ Returns `{ settings; runtimeInputs; }`. Both are values: no settings file is wri
 | --- | --- |
 | Plugin compiled in this payload | `{ source = "<store path>"; extensions = [ ]; }` |
 | Plugin not compiled in this payload | `{ source = "<store path>"; }` |
+| Compiled plugin with `shared = true` | `{ source = "<store path>"; }`, plus `piBolt.packages = [ { source = "<same store path>"; extensions = [ ]; } ]` |
 | Ordinary Pi package entry | Passed through unchanged. |
 
 Compiled package entries disable only their runtime extension resource; skills, prompts and themes remain discoverable through
@@ -52,7 +55,8 @@ value never changes the payload's own tool list.
   derivation are deduplicated.
 - A compiled `builtin = false` plugin must remain selected because the renderer cannot disable it.
 - Built-in IDs and extension paths are not validated. Unknown IDs can have no effect; use `pi-bolt doctor` to inspect loading.
-- The renderer does not create `piBolt.packages` overlays, resolve resource-name collisions or manage writable files.
+- The renderer does not resolve resource-name collisions or manage writable files. With `shared = true` it writes the `piBolt`
+  overlay for every selected compiled plugin; other entries are rendered as above.
 - Runtime package entries under `closed` have not been behaviourally verified. Extension filtering is not process sandboxing.
 
 For merging and stock-Pi coexistence, see [settings and selections](../guides/settings.md).

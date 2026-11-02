@@ -36,7 +36,8 @@ Use `pkgs.pi-bolt.override { ... }`. These consumer arguments are distinct from 
 | `jit` | `false` | Enable the JIT alongside AOT code. Runtime-loaded extensions are otherwise interpreted. |
 | `maxAotCandidateBytecodeSize` | `null` | Override the upstream maximum candidate module bytecode size, in bytes. `null` leaves the upstream setting. |
 | `checkRuntimeStamp` | `true` | Fail on a source/runtime stamp mismatch; `false` warns instead. |
-| `runtimeInputs` | `[ pkgs.ripgrep pkgs.fd ]` | Programs provided by the package. This override replaces the default list. Launcher `path` is additive. |
+| `runtimeInputs` | `[ pkgs.ripgrep pkgs.fd ]` | The base program list. Overriding it replaces those defaults. |
+| `extraPackages` | `[ ]` | Programs added to `runtimeInputs` for every entrypoint. Use this to add tools; `runtimeInputs` sets the base. |
 
 A module larger than the AOT limit is left out of the compiled image and interpreted; the compiler names it. Raising the limit
 can make compilation slower and the image larger. Use it for a named refusal, not as a general performance setting.
