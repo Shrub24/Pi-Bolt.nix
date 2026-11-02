@@ -116,6 +116,14 @@ let
   };
   lockedPayload = (pi-bolt.withPlugins (_: [ locked ])).override { pluginLock = lockedLock; };
   lockedShared = (lockedPayload.select { shared = true; }).settings;
+  # A lock whose member is named after the manifest's folder rather than the plugin: nothing in this payload compiles it.
+  renamedLock = lockedLock // {
+    packages = (lib.removeAttrs lockedLock.packages [ "pbplugins/settings-locked" ]) // {
+      "pbplugins/renamed" = lockedLock.packages."pbplugins/settings-locked";
+    };
+  };
+  selectAccepts =
+    payload: args: (builtins.tryEval (builtins.deepSeq (payload.select args) true)).success;
 
   payload = pi-bolt.withPlugins (_: [ plugin ]);
   # The file for a directory stock Pi reads too.
@@ -180,6 +188,9 @@ assert !(sharedNothingSelected ? piBolt);
 # runtime view instead, and the overlay names the same source so the replacement is in place.
 assert lib.hasInfix "/pbplugins/settings-locked" (lib.head lockedShared.packages).source;
 assert (lib.head lockedShared.piBolt.packages).source == (lib.head lockedShared.packages).source;
+# A lock naming members this payload does not compile is refused when a selection renders it, rather than mapping nothing and
+# emitting a store path stock Pi cannot load.
+assert !(selectAccepts (lockedPayload.override { pluginLock = renamedLock; }) { shared = true; });
 # A plugin left out of the selection has no entry, and its compiled copy is switched off by name.
 assert sources leftOut.packages == [ "${runtime}" ];
 assert lib.elem "-builtin:settings-compiled" leftOut.extensions;

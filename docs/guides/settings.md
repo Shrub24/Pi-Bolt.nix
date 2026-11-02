@@ -138,7 +138,9 @@ the AOT code and any patches applied to it go unused. That is why the two declar
 When the payload takes its plugins' dependencies from a `pluginLock`, the entry names a **runtime view** instead of the plugin's
 own store path: a copy of each plugin's sources under one root whose `node_modules` is the lock's installed tree. Pi resolves a
 local package's imports from where its files are, and a plugin's own store path has none of them, so pointing stock Pi there fails
-with `Cannot find module`. The view costs the source copies only; the dependency tree stays one shared copy.
+with `Cannot find module`. The view costs the source copies only; the dependency tree stays one shared copy. Its member names are the plugin names the
+payload compiles — `tool-renderer`, not the manifest's folder — so pass `NAME=…` to `update-plugin-lock` when the two differ; a
+lock that names something else is refused rather than rendered.
 
 An exclusion (`-npm:<name>`) is for the other case: the same plugin also declared from a different source, such as an npm entry
 left in `packages`. Identities differ then, both entries survive, and Pi-Bolt would load the runtime copy — remove that source in

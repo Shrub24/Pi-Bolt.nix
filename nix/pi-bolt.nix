@@ -148,9 +148,13 @@ stdenvNoCC.mkDerivation (
         );
     # Where a shared settings file should point a plugin: the view above when it exists, otherwise the plugin itself, which
     # carries its own tree (packageLock, nodeModules).
-    runtimeSources = lib.mapAttrs' (name: _: lib.nameValuePair name "${runtimeSet}/pbplugins/${name}") (
-      lib.listToAttrs (map (plugin: lib.nameValuePair plugin.piBolt.name plugin) lockedPlugins)
-    );
+    runtimeSources =
+      # A lock whose member names match no compiled plugin would silently map nothing here, and a shared selection would
+      # render store paths stock Pi cannot load. Forcing `pluginSet` runs the check that refuses such a lock.
+      assert pluginLock == null || pluginSet != null;
+      lib.mapAttrs' (name: _: lib.nameValuePair name "${runtimeSet}/pbplugins/${name}") (
+        lib.listToAttrs (map (plugin: lib.nameValuePair plugin.piBolt.name plugin) lockedPlugins)
+      );
 
     workspace = callPackage ./workspace.nix {
       src = sources.workspace;
