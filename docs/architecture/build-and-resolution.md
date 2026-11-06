@@ -41,6 +41,11 @@ artifacts need separate preparation.
 Pi supplies `@earendil-works/pi-*` and `typebox` to extensions. The compile staging excludes copies with those names; no range
 check is imposed on the host copy.
 
+Pi 1.5.0 (Pi-Bolt 1.1.0) moved `Type` out of pi-ai's root, so a compiled plugin imports it from `typebox`, as the loader gives it
+to run-time extensions. An import of `Type` — or any of the legacy names pi-ai's compat entry keeps — from
+`@earendil-works/pi-ai` fails to compile here, because this path maps host packages to their sources rather than to the view
+`pi-bolt compile` builds.
+
 Pi's runtime loader also aliases legacy `@mariozechner/pi-*` and `@sinclair/typebox` names. The compile staging/TypeScript
 mapping does not mirror that full alias set: legacy imports can fail to resolve or bundle another copy. Prefer the current
 host package names when compiling extensions.

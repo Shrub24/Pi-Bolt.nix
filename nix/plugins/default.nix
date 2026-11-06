@@ -31,6 +31,12 @@ lib.makeScope newScope (self: {
       name = "word-count-source";
     };
     entry = "word-count.ts";
+    # Pi 1.5.0 moved `Type` out of pi-ai's root into the typebox view extensions get, so the example's own import no longer
+    # resolves on the compile path, which maps host packages to their sources.
+    postPatch = ''
+      substituteInPlace word-count.ts \
+        --replace-fail 'import { Type } from "@earendil-works/pi-ai";' 'import { Type } from "typebox";'
+    '';
     meta.license = lib.licenses.mit;
   };
 })
