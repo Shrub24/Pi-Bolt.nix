@@ -49,6 +49,33 @@ tools and those of its compiled plugins, so this value holds the tools of select
 npm/git/filter entries supply no tool metadata. A selection of exactly the compiled plugins therefore returns `[ ]`, and the
 value never changes the payload's own tool list.
 
+## Shared settings
+
+With `shared = true`, each compiled plugin renders as one store entry per binary:
+
+```json
+{
+  "packages": [{ "source": "/nix/store/…-radar" }],
+  "piBolt": {
+    "packagesOverlay": true,
+    "packages": [{ "source": "/nix/store/…-radar", "extensions": [] }]
+  }
+}
+```
+
+Stock Pi loads the entry in `packages`. Pi-Bolt applies `piBolt.packages` over it first: entries match by source (`local:<path>`
+for a store path), and an entry with the same source replaces the earlier one in place, so no `-<source>` exclusion is needed.
+Without the overlay the store copy loads at run time and answers instead of the compiled one. `piBolt` is read only by Pi-Bolt.
+
+- Entries that are not plugin derivations are passed through to both binaries unchanged, with no overlay entry.
+- A `-<source>` exclusion is required only when the same plugin is also declared from a different source (`npm:`, `git:`).
+  The renderer cannot emit it, because it does not see the rest of the settings file.
+- When the payload has a `pluginLock`, the source is the plugin's folder in a **runtime view** instead of its own store path:
+  plugin sources under one root whose `node_modules` is the lock's installed tree, so stock Pi can resolve the dependencies.
+  Only sources are copied; the tree is shared. The lock's member names must be the compiled plugin names, otherwise `select`
+  fails with the same error as the build.
+- No overlay is emitted for an empty selection.
+
 ## Constraints and limits
 
 - Different plugin derivations cannot share a name across the selected and compiled sets. Repeated references to the same

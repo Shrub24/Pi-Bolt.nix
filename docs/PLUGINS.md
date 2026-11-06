@@ -29,11 +29,11 @@ Plugin documentation is now split by task. Start with [getting started](getting-
 
 ### Footguns
 
-[Settings merging and duplicate runtime copies](guides/settings.md#combine-with-other-settings).
+[Settings merging and duplicate runtime copies](guides/settings.md#combining-settings).
 
 ### Shared settings files
 
-[Share configuration with stock Pi](guides/settings.md#share-configuration-with-stock-pi).
+[Share configuration with stock Pi](guides/settings.md#run-it-beside-stock-pi).
 
 ## Large modules
 

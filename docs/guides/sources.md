@@ -20,21 +20,8 @@ inputs.my-pi-bolt = {
 inputs.pi-bolt-nix.inputs.pi-bolt-source.follows = "my-pi-bolt";
 ```
 
-A declared input without a `flake.nix` needs `flake = false`. Otherwise Nix fails while trying to evaluate it as a flake.
-
-Alternatively override the source input already declared by Pi-Bolt.nix:
-
-```nix
-inputs.pi-bolt-nix.inputs.pi-bolt-source.url = "path:../Pi-Bolt";
-```
-
-For one build of a consuming flake whose input is named `pi-bolt-nix`:
-
-```sh
-nix build --override-input pi-bolt-nix/pi-bolt-source path:../Pi-Bolt
-```
-
-When building Pi-Bolt.nix itself, the input path is just `pi-bolt-source`.
+For a one-off build, `nix build --override-input pi-bolt-nix/pi-bolt-source path:../Pi-Bolt` (just `pi-bolt-source` when building
+Pi-Bolt.nix itself).
 
 ## Match the released runtime
 

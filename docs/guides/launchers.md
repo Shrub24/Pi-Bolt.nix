@@ -33,9 +33,7 @@ value lists only what the launcher does not already carry: the tools of plugins 
 - Launchers accept no flags. A flag prepended to user arguments can break subcommand dispatch. Put configuration in settings,
   `env` or `path` instead.
 
-For programs needed by every entrypoint, use the package's `extraPackages`; a launcher's `path` adds only to that entrypoint.
-Avoid Home Manager's `extraPackages` wrapper here: it wraps only `bin/pi`, not all Pi-Bolt entrypoints, and changes the
-installation layout.
+For programs every entrypoint needs, use the package's `extraPackages`; Home Manager's wraps only `bin/pi`.
 
 ## Link entrypoints into another output
 

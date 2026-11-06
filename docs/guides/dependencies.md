@@ -34,32 +34,18 @@ nix run .#pi-bolt.updatePluginLock -- -o plugins.lock.json \
 Each plugin's folder in the lock is its name, taken from the manifest's folder. Prefix a manifest when they differ:
 `radar=./checkouts/borrowed/package.json`. The name is the plugin's `pluginName`, the same string the payload compiles it as.
 
-`.#pi-bolt` is whatever attribute your flake exposes the payload as. Paths are read from the current directory. The command
-needs network access to resolve npm ranges; the resulting lock is committed, and builds fetch its integrity-pinned
-dependencies and install offline without resolving new versions.
-
-The shared project contains the plugins, not Pi. Compatible dependencies share a copy; incompatible versions can nest under a
-plugin. Updating Pi-Bolt alone does not invalidate the lock. See the [lock reference](../reference/plugin-lock.md) for the exact
-file contract and errors.
+`.#pi-bolt` is whatever attribute your flake exposes the payload as. Resolving ranges needs network; commit the lock, and builds
+install its integrity-pinned dependencies offline. The lock covers the plugins, not Pi, so a Pi-Bolt update does not invalidate
+it. File contract and errors: [lock reference](../reference/plugin-lock.md).
 
 ## Keep manifests and pins together
 
-The lock is only correct for the manifests it was generated from. Resolve those manifests **during the update**, not from paths
-frozen when an updater was evaluated: a script that does the latter can move a pin while regenerating the lock from the old
-manifest.
-
-### Recommended shape
-
-One update step moves each plugin's pin, obtains that plugin's `package.json` in the same run, then calls `update-plugin-lock`
-once with all the manifests. Commit the pins and the lock together, so they cannot disagree. Expose it as a
-`passthru.updateScript` on the package that owns the plugin set; `nix-update --use-update-script` then drives it.
-
-[`pkgs/pi-plugins`](https://github.com/Shrub24/nix-dotfiles/tree/main/pkgs/pi-plugins) in the author's `nix-dotfiles` is a
-working instance: source recipes, a committed `plugins.lock.json`, and an update script that runs `update-plugin-lock`.
-
-This package ships no `updateScript` of its own, because the member list belongs to the consumer's plugin set. Any tool that
-writes a compatible npm lock is acceptable; manifests may be checked in, generated, or extracted from an archive during the
-update.
+The lock is correct only for the manifests it was generated from, so obtain them during the update, not from paths frozen when
+an updater was evaluated. The recommended shape is one update step that moves each pin, fetches that plugin's `package.json` in
+the same run, and calls `update-plugin-lock` once; commit pins and lock together. Expose it as `passthru.updateScript` and
+[`nix-update --use-update-script`](https://github.com/Mic92/nix-update) drives it. A working instance is
+[`pkgs/pi-plugins`](https://github.com/Shrub24/nix-dotfiles/tree/main/pkgs/pi-plugins) in `nix-dotfiles`. Any tool that writes a
+compatible npm lock will do.
 
 For the local [example plugin](https://github.com/Shrub24/Pi-Bolt.nix/tree/main/examples/plugin-set), from the repository root:
 
@@ -76,9 +62,8 @@ Pass its lock to `buildPiBoltPlugin`:
 packageLock = ./plugin/package-lock.json;
 ```
 
-Keep the lock and matching `package.json` beside each other in the consuming repository. The builder installs the locked
-dependencies offline into the plugin's own `node_modules`, for compiled or runtime use. Identical libraries in separate plugin
-folders can be bundled more than once.
+Keep it beside the plugin's `package.json` in the consuming repository. The locked dependencies install offline into the
+plugin's own `node_modules`, for compiled or runtime use; a library two plugins both carry is bundled twice.
 
 For custom installation steps or a different package manager, pass a prepared directory instead:
 

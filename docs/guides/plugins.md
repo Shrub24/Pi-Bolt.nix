@@ -62,8 +62,7 @@ src = pkgs.fetchurl {
 entry = "extensions/loop-police.ts";
 ```
 
-The hash is illustrative: obtain the actual archive hash before using this recipe. The builder unpacks the archive. Supply npm
-dependencies using a [shared `pluginLock` or per-plugin `packageLock`](dependencies.md).
+Supply npm dependencies with a [`pluginLock` or `packageLock`](dependencies.md).
 
 ### Published to npm
 
@@ -90,8 +89,7 @@ postPatch = ''
 '';
 ```
 
-Both operate at the plugin root. A root-level `config.ts` has patch paths such as `a/config.ts`, not `a/src/config.ts`.
-`--replace-fail` makes upstream changes visible instead of silently skipping a replacement.
+Both run at the plugin root, so patch paths are `a/config.ts`, not `a/src/config.ts`.
 
 ## Add tools or another plugin
 

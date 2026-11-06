@@ -13,7 +13,7 @@ nix run github:Shrub24/Pi-Bolt.nix -- --version
 nix run github:Shrub24/Pi-Bolt.nix
 ```
 
-The first build compiles Pi-Bolt from source. Provider login and agent usage are Pi's; see
+The first build compiles from source. Usage and provider login are Pi's: see
 [Pi's documentation](https://github.com/earendil-works/pi/tree/main/packages/coding-agent/docs).
 
 ## Install with your plugins compiled in
@@ -71,19 +71,13 @@ One package carries the agent, the plugins compiled into it, and its launch conf
 }
 ```
 
-Apply with `home-manager switch --flake .#me`. `programs.pi-coding-agent` is Home Manager's module; this flake supplies packages and
-an overlay, not modules of its own.
+Apply with `home-manager switch --flake .#me`. `programs.pi-coding-agent` is
+[Home Manager's module](https://nix-community.github.io/home-manager/options.xhtml#opt-programs.pi-coding-agent.enable); this
+flake supplies the package and overlay only.
 
-The result installs `pi-bolt` and `pi`, both running the same compiled executable. `pi-bolt` is the package's default launcher:
-it puts the plugin and package tools on `PATH` and starts Pi with no environment of its own, so it uses Pi's usual agent
-directory.
-
-Two overrides worth knowing:
-
-- `extraPackages` **adds** programs to every entrypoint; `runtimeInputs` is the base list (`ripgrep`, `fd`) and overriding it
-  replaces them. A single launcher can add its own with `launchers.<name>.path`.
-- `maxAotCandidateBytecodeSize` raises the compiler's per-module ceiling. Set it only when the build refuses a module and names
-  it; large modules then compile instead of failing.
+This installs `pi-bolt` and `pi`, the same compiled executable. `pi-bolt` is the default launcher: it adds the plugins' tools to
+`PATH` and uses Pi's usual agent directory. `extraPackages` adds programs to every entrypoint; the other overrides are in the
+[package reference](reference/package.md).
 
 Elsewhere only the package set the overlay goes into changes:
 
@@ -91,9 +85,6 @@ Elsewhere only the package set the overlay goes into changes:
 - **Home Manager inside NixOS:** the same overlay on the NixOS side and `home-manager.useGlobalPkgs = true`, so the user's
   `programs.pi-coding-agent.package` resolves. Apply with `nixos-rebuild`, not a separate switch.
 - **Nothing to customise:** `pi-bolt-nix.packages.${system}.default` is the package without an overlay or plugins.
-
-Following the consuming flake's `nixpkgs` can change dependencies and cache reuse; see
-[cache boundaries](architecture/build-and-resolution.md#caching).
 
 ## Check what was compiled in
 
@@ -107,20 +98,12 @@ executable.
 
 ## Share that configuration with native Pi
 
-This part is optional. `pkgs.pi-bolt` needs neither stock Pi nor stock Pi's settings to be installed, and installing the package
-on its own leaves your settings file alone.
+Optional. Installing the package leaves your settings alone. Both binaries read `~/.pi/agent` by default, and setting
+`programs.pi-coding-agent.settings` makes that file a read-only store link.
 
-The default agent directory is `~/.pi/agent`, the same one the upstream `pi` CLI uses, so when both binaries are installed they
-read one settings file. Adding `programs.pi-coding-agent.settings` puts that file under Nix's control, as a read-only store link.
-
-- **One configuration for both:** keep the default directory and render the settings with `payload.select { shared = true; }`. The
-  plugin's store entry stays loadable for stock Pi, while Pi-Bolt's overlay replaces it with a resources-only entry, so Pi-Bolt runs
-  the AOT copy and stock Pi loads the same derivation itself. See
-  [share configuration with stock Pi](guides/settings.md#share-configuration-with-stock-pi). Which binary runs is decided by
-  `PATH`.
-- **Separate configurations:** set `programs.pi-coding-agent.configDir` to a private directory, or give an entrypoint its own
-  directory with a [launcher](guides/launchers.md). Home Manager exports `PI_CODING_AGENT_DIR` when the directory is not the
-  default.
+- **One file for both:** render it with `payload.select { shared = true; }`; see [run it beside stock Pi](guides/settings.md#run-it-beside-stock-pi).
+- **Separate:** set `programs.pi-coding-agent.configDir`, or give an entrypoint its own directory with a
+  [launcher](guides/launchers.md).
 
 ## Start without external inputs
 
@@ -161,8 +144,5 @@ them into the role's directory.
 nix flake update pi-bolt-nix pi-extensions
 ```
 
-Rebuild the consuming configuration. Nix owns this installation: update the flake rather than using the upstream installer's
-`pi-bolt update` or `pi-bolt compile` commands to modify it. Compiled plugins are selected in Nix.
-
-A Pi-Bolt release update alone does not invalidate a standalone plugin lock. Regenerate that lock when a plugin's dependencies
-change; see [npm dependencies](guides/dependencies.md).
+Then rebuild. Nix owns this installation, so do not use upstream's `pi-bolt update` or `pi-bolt compile` on it. A plugin lock
+is regenerated only when a plugin's dependencies change; see [npm dependencies](guides/dependencies.md).
