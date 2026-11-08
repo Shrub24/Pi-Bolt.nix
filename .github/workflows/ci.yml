@@ -32,3 +32,7 @@ jobs:
           for check in $checks; do
             nix build ".#checks.$system.$check" --print-build-logs
           done
+      # Non-blocking: Pi-Bolt generates its systemd unit in code, so a release can change the shape we write. Flag it, do not
+      # fail the build over it.
+      - run: nix run .#checkSystemdUnit
+        continue-on-error: true

@@ -34,6 +34,10 @@
         );
     in
     {
+      # The one module here: an opt-in unit for the remote control background service, which `pi-bolt service install` would
+      # otherwise write by hand (and fail on, over a store-linked home).
+      homeManagerModules.remote-control = ./nix/modules/remote-control.nix;
+
       overlays.default = final: _prev: {
         piBoltPlugins = final.callPackage ./nix/plugins { source = pi-bolt-source; };
         pi-bolt-runtime = final.callPackage ./nix/runtime.nix { };
@@ -71,8 +75,19 @@
         pi-bolt-example = pkgs.pi-bolt.withPlugins (ps: [ ps.word-count ]);
       });
 
-      # Run from the repository root: it edits nix/runtime.nix there.
       apps = forAllSystems (pkgs: {
+        # Never fails: flags a release whose unit template changed, for a person to look at (CI runs it non-blocking).
+        checkSystemdUnit = {
+          type = "app";
+          program = nixpkgs.lib.getExe (
+            pkgs.callPackage ./nix/check-systemd-unit.nix {
+              runtime = pkgs.pi-bolt-runtime;
+              source = pi-bolt-source;
+            }
+          );
+          meta.description = "Compare nix/remote-control-unit.nix with the unit the pinned Pi-Bolt generates";
+        };
+        # Run from the repository root: it edits nix/runtime.nix there.
         update-runtime = {
           type = "app";
           program = nixpkgs.lib.getExe (pkgs.callPackage ./nix/update-runtime.nix { });

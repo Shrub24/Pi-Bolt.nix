@@ -16,7 +16,7 @@ export default defineConfig({
       sidebar: [
         { slug: 'index' },
         { label: 'Getting started', items: [{ slug: 'getting-started' }] },
-        { label: 'Guides', items: ['guides/plugins', 'guides/dependencies', 'guides/settings', 'guides/launchers', 'guides/sources'] },
+        { label: 'Guides', items: ['guides/plugins', 'guides/dependencies', 'guides/settings', 'guides/launchers', 'guides/remote-control', 'guides/sources'] },
         { label: 'Reference', items: ['reference/package', 'reference/plugin-builder', 'reference/selection', 'reference/plugin-lock'] },
         { label: 'Architecture', items: ['architecture/build-and-resolution'] },
         { label: 'Contributing', items: ['contributing/development', 'contributing/documentation', 'contributing/releases'] },

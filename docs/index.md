@@ -8,8 +8,9 @@ Install [Pi-Bolt](https://github.com/opensec-git/Pi-Bolt) through Nix, with opti
 Keep the agent, plugin dependencies and launch configuration in the same declarative setup. Runtime-loaded extensions are also
 supported.
 
-This is an unofficial package for **x86_64-linux** and **aarch64-linux**, not a NixOS or Home Manager module. The first build
-compiles from source using Pi-Bolt's released engine; it can take a while.
+This is an unofficial package for **x86_64-linux** and **aarch64-linux**. Installation is the package and its overlay, not a
+module; the one module here is an opt-in unit for the remote control service. The first build compiles from source using
+Pi-Bolt's released engine; it can take a while.
 
 ## Start using it
 
@@ -37,6 +38,7 @@ The [example instructions](https://github.com/Shrub24/Pi-Bolt.nix/blob/main/exam
 - [Supply npm dependencies](guides/dependencies.md) with a shared set lock or a plugin's own lock.
 - [Render settings](guides/settings.md) for compiled and runtime plugins, including their skills, prompts and themes.
 - [Add launchers](guides/launchers.md) with different configuration roots and tools.
+- [Run remote control as a service](guides/remote-control.md), so paired phones reach the computer with no terminal open.
 - [Build another source](guides/sources.md), such as a fork or a branch.
 
 ## Look up an interface
