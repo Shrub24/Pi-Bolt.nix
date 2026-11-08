@@ -42,12 +42,41 @@ choice, not a Pi-Bolt one:
 | Cloudflare tunnel on your hostname | `remoteControl.service.tunnel = { name = "..."; hostname = "..."; }`, after `cloudflared tunnel create` and the DNS route. |
 
 The default is `"quick"`, so a phone can connect from anywhere once `cloudflared` is installed; with no `cloudflared` the
-service logs it and serves the first two paths. Traffic is end-to-end encrypted (Noise), so the tunnel operator relays
-ciphertext. On NixOS the firewall still has to allow the port, or trust the interface:
+service logs it and serves the first two paths. The first two also need the port open; the tunnel does not, because
+`cloudflared` reaches it over loopback:
 
 ```nix
-networking.firewall.interfaces."tailscale0".allowedTCPPorts = [ 48123 ];
+networking.firewall.interfaces."tailscale0".allowedTCPPorts = [ 48123 ];  # for the VPN path only
 ```
+
+### Named tunnel
+
+A named tunnel keeps one hostname. Pi-Bolt runs
+`cloudflared tunnel --no-autoupdate run --url http://127.0.0.1:<port> <name>`, so it forwards every request for that
+hostname to the listener and reads nothing:
+
+```sh
+cloudflared tunnel create pi-bolt        # writes ~/.cloudflared/<uuid>.json
+cloudflared tunnel route dns pi-bolt pi.example.com   # proxied CNAME; cloudflared does not create it
+```
+
+```nix
+programs.pi-coding-agent.settings.remoteControl.service.tunnel = {
+  name = "pi-bolt";
+  hostname = "pi.example.com";
+};
+```
+
+The credentials file is a secret and stays outside the store, like `auth.json`. `--no-autoupdate` makes its version yours,
+which under Nix is what you want; do not also run `services.cloudflared` for the same tunnel.
+
+What protects the hostname is the protocol, not the edge: an HTTP request gets `404`, and a WebSocket reaches one Noise
+handshake, refused after 3 s, 70 KB, 3 pending handshakes per address, 64 in total, and 10 failures per address in 10
+minutes. There is no Cloudflare Access support — the phone is a native app, not a browser — so do not put Access, a JS
+challenge or a bot check in front of it. A rate-limit or country rule does not break the app and keeps the scanning down.
+
+Exposure differs by path, and only the firewall decides it: the listener binds every interface, so closing the port is what
+makes the tunnel the only way in, while a VPN path needs it open on that interface.
 
 ## Before you enable it
 
