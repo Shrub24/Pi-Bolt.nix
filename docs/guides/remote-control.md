@@ -29,6 +29,26 @@ Enable it from the Home Manager module this flake ships:
 
 `pi-bolt service status`, `pair` and `logs` work unchanged: they read the same unit file and ask `systemctl --user`.
 
+## Reaching a phone
+
+The service listens on every interface at one port (`remoteControl.port`, else 48123), so how a phone gets to it is a network
+choice, not a Pi-Bolt one:
+
+| Path | What it needs |
+| --- | --- |
+| Same network | Nothing. The addresses are listed as `local`. |
+| A VPN you already run (Tailscale, WireGuard) | Nothing here: a `100.64.0.0/10` address is listed as `tailscale`, any other as `local`. |
+| Cloudflare tunnel, no account | `cloudflared` on the launcher's `PATH`, and `remoteControl.service.tunnel = "quick"`. The hostname is random and changes when the tunnel restarts; connected phones get the new one. |
+| Cloudflare tunnel on your hostname | `remoteControl.service.tunnel = { name = "..."; hostname = "..."; }`, after `cloudflared tunnel create` and the DNS route. |
+
+The default is `"quick"`, so a phone can connect from anywhere once `cloudflared` is installed; with no `cloudflared` the
+service logs it and serves the first two paths. Traffic is end-to-end encrypted (Noise), so the tunnel operator relays
+ciphertext. On NixOS the firewall still has to allow the port, or trust the interface:
+
+```nix
+networking.firewall.interfaces."tailscale0".allowedTCPPorts = [ 48123 ];
+```
+
 ## Before you enable it
 
 - **Do not also run `pi-bolt service install`.** It writes the same unit file itself, which fails with `EACCES` over this
