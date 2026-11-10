@@ -80,8 +80,17 @@ makes the tunnel the only way in, while a VPN path needs it open on that interfa
 
 ## Before you enable it
 
+- **Remote control must be on.** Pi-Bolt 1.2.0 turns it off by default, and the service exits at once when it is off, so
+  enable the setting or the unit starts and immediately stops:
+
+  ```nix
+  programs.pi-coding-agent.settings.remoteControl.enabled = true;
+  ```
+
 - **Do not also run `pi-bolt service install`.** It writes the same unit file itself, which fails with `EACCES` over this
   module's store link. Declare the unit, or use `service install`, not both.
+- **After an upgrade**, `pi-bolt service restart` runs the installed version; the installers and `pi-bolt update` do it
+  themselves.
 - **Lingering**, if the service must outlive your last session: `users.users.<name>.linger = true` on NixOS, or
   `loginctl enable-linger`. Home Manager cannot set it.
 - **The tunnel** is a setting, not a flag: `remoteControl.service.tunnel` (`"off"` serves the local network and Tailscale
