@@ -31,6 +31,10 @@ let
     "packages"
     "scripts/build-coding-agent-bundle.mjs"
     "scripts/package-files.mjs"
+    # The build formats generated modules with biome (Pi 1.2.0), which reads its config and that config's plugin. Without them
+    # biome falls back to its defaults and the regenerated modules no longer match the committed ones.
+    "biome.json"
+    "scripts/biome"
   ];
 in
 {
