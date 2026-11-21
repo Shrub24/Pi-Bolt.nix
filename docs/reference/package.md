@@ -33,6 +33,7 @@ Use `pkgs.pi-bolt.override { ... }`. These consumer arguments are distinct from 
 | `plugins` | `[ ]` | Extension derivations to register in the executable. Their plugin dependencies are staged transitively. |
 | `pluginLock` | `null` | Path to an npm lock, or parsed lock attribute set. See [lock contract](plugin-lock.md). |
 | `launchers` | `{ }` | Attribute set of entrypoint name to `{ env, path }`. |
+| `patches` | `[ ]` | Patches to the source, applied when the npm workspace builds. See [patch the source](../guides/sources.md#patch-the-source). |
 | `jit` | `false` | Enable the JIT alongside AOT code. Runtime-loaded extensions are otherwise interpreted. |
 | `maxAotCandidateBytecodeSize` | `null` | Override the upstream maximum candidate module bytecode size, in bytes. `null` leaves the upstream setting. |
 | `checkRuntimeStamp` | `true` | Fail on a source/runtime stamp mismatch; `false` warns instead. |

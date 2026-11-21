@@ -29,6 +29,10 @@ args@{
   source,
   piBoltPlugins,
 
+  # Patches to the source, applied when the workspace builds, so evaluation still reads the unpatched input. They may touch
+  # the files the workspace builds from (nix/source.nix) other than the manifests and lock, which evaluation reads.
+  patches ? [ ],
+
   # Plugins to compile in: buildPiBoltPlugin derivations. Each is a built-in extension, builtin:<name>.
   plugins ? [ ],
   # One npm lock for the plugins' dependencies: a standalone npm project with each plugin as a workspace, as `update-plugin-lock`
@@ -159,7 +163,7 @@ stdenvNoCC.mkDerivation (
     workspace = callPackage ./workspace.nix {
       src = sources.workspace;
       lockfileRoot = source.outPath;
-      inherit version;
+      inherit version patches;
     };
 
     # Deduplicate identical derivations, not names: different patched versions must not silently replace one another.

@@ -11,10 +11,12 @@
   # evaluates). npmRoot stays src, so the workspace still changes only when the files it builds from do.
   lockfileRoot,
   version,
+  # The compile copies this tree over its own, so patching here patches what gets compiled.
+  patches,
 }:
 stdenv.mkDerivation {
   pname = "pi-bolt-workspace";
-  inherit src version;
+  inherit src version patches;
 
   # Pi's own npm dependencies, all integrity-pinned in the lockfile: no hash to maintain here.
   npmDeps = importNpmLock {
