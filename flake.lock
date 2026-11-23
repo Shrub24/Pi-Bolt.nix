@@ -19,16 +19,16 @@
     "pi-bolt": {
       "flake": false,
       "locked": {
-        "lastModified": 1794375206,
-        "narHash": "sha256-Dx5i+i9nbPKQ4mdBye2V6GA0NPD/I2hAzN0ZAqhPKms=",
+        "lastModified": 1795304008,
+        "narHash": "sha256-NXVzdKUQN2bMCn1RMwTCLEUlgIckPVqZH+UA8XSbWxI=",
         "owner": "opensec-git",
         "repo": "Pi-Bolt",
-        "rev": "e1eb3f775369b10bdfc27e503e6d51b0f1039d88",
+        "rev": "16e30f07d44527d7744be093748179e26fd56c71",
         "type": "github"
       },
       "original": {
         "owner": "opensec-git",
-        "ref": "bolt-v1.2.1",
+        "ref": "bolt-v1.3.0",
         "repo": "Pi-Bolt",
         "type": "github"
       }
